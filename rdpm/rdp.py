@@ -59,18 +59,23 @@ class CredentialStore:
         if pw:
             self.set_password(dst, pw)
 
-    def get_token(self) -> str | None:
+    # Clés API : « api-token » (ancienne clé unique) ou « api-token:<id> » (une par projet).
+    @staticmethod
+    def _token_user(key_id: str | None) -> str:
+        return f"{KEYRING_TOKEN_USER}:{key_id}" if key_id else KEYRING_TOKEN_USER
+
+    def get_token(self, key_id: str | None = None) -> str | None:
         try:
-            return keyring.get_password(KEYRING_SERVICE, KEYRING_TOKEN_USER)
+            return keyring.get_password(KEYRING_SERVICE, self._token_user(key_id))
         except KeyringError:
             return None
 
-    def set_token(self, token: str) -> None:
-        keyring.set_password(KEYRING_SERVICE, KEYRING_TOKEN_USER, token)
+    def set_token(self, token: str, key_id: str | None = None) -> None:
+        keyring.set_password(KEYRING_SERVICE, self._token_user(key_id), token)
 
-    def delete_token(self) -> None:
+    def delete_token(self, key_id: str | None = None) -> None:
         try:
-            keyring.delete_password(KEYRING_SERVICE, KEYRING_TOKEN_USER)
+            keyring.delete_password(KEYRING_SERVICE, self._token_user(key_id))
         except (PasswordDeleteError, KeyringError):
             pass
 
@@ -111,14 +116,14 @@ class MemoryCredentialStore(CredentialStore):
     def delete_password(self, slug: str) -> None:
         self._data.pop(self._user(slug), None)
 
-    def get_token(self) -> str | None:
-        return self._data.get("token")
+    def get_token(self, key_id: str | None = None) -> str | None:
+        return self._data.get(self._token_user(key_id))
 
-    def set_token(self, token: str) -> None:
-        self._data["token"] = token
+    def set_token(self, token: str, key_id: str | None = None) -> None:
+        self._data[self._token_user(key_id)] = token
 
-    def delete_token(self) -> None:
-        self._data.pop("token", None)
+    def delete_token(self, key_id: str | None = None) -> None:
+        self._data.pop(self._token_user(key_id), None)
 
 
 def write_termsrv_cred(host: str, user: str, password: str) -> bool:

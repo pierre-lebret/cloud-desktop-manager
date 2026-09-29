@@ -1,11 +1,12 @@
 """Hetzner RDP Manager — lance, sauvegarde et ferme des bureaux Windows à la demande.
 
 Usage :
-    python app.py                 compte Hetzner réel (token : HETZNER_TOKEN, .env, Gestionnaire d'identifiants,
-                                  sinon saisi dans la barre en haut de la fenêtre)
+    python app.py                 comptes Hetzner réels : la clé HETZNER_TOKEN du .env (toujours chargée) plus
+                                  les clés mémorisées dans le Gestionnaire d'identifiants (un projet par clé)
     python app.py --readonly      lit le vrai compte sans jamais rien modifier
     python app.py --fake          simulation complète, sans appel à Hetzner (temps accéléré)
     python app.py --fake --fake-fail=snapshot,shutdown_timeout   injecte des pannes
+    python app.py --fake --fake-projects=2                      deux projets simulés
 """
 
 from __future__ import annotations
@@ -55,14 +56,22 @@ def setup_logging() -> None:
     warnings.filterwarnings("ignore", category=DeprecationWarning, module="hcloud")
 
 
-def resolve_token(creds: rdp.CredentialStore) -> tuple[str | None, str | None]:
-    """Token et sa provenance : variable d'environnement, .env, puis Gestionnaire d'identifiants."""
-    for source, token in (("env", os.environ.get("HETZNER_TOKEN")),
-                          (".env", dotenv_values(HERE / ".env").get("HETZNER_TOKEN"))):
+def env_token() -> tuple[str | None, str | None]:
+    """Clé du fichier .env (prioritaire), sinon de la variable d'environnement HETZNER_TOKEN."""
+    for source, token in ((".env", dotenv_values(HERE / ".env").get("HETZNER_TOKEN")),
+                          ("env", os.environ.get("HETZNER_TOKEN"))):
         if (token or "").strip():
             return token.strip(), source
-    token = creds.get_token()
-    return (token, "keyring") if token else (None, None)
+    return None, None
+
+
+def resolve_token(creds: rdp.CredentialStore) -> tuple[str | None, str | None]:
+    """Clé principale : .env / variable d'environnement, sinon la première clé mémorisée (scripts, tests)."""
+    token, source = env_token()
+    if token:
+        return token, source
+    legacy = creds.get_token()
+    return (legacy, "keyring") if legacy else (None, None)
 
 
 def main() -> int:
@@ -72,6 +81,7 @@ def main() -> int:
     parser.add_argument("--fake-fail", default="", help="pannes simulées, séparées par des virgules")
     parser.add_argument("--fake-seed", default="demo", choices=("demo", "account"),
                         help="données de départ de la simulation")
+    parser.add_argument("--fake-projects", type=int, default=1, help="nombre de projets simulés")
     parser.add_argument("--readonly", action="store_true", help="lecture seule sur le vrai compte")
     args = parser.parse_args()
 
@@ -83,20 +93,37 @@ def main() -> int:
     from rdpm import notify
     from rdpm.controller import AppController
     from rdpm.hetzner.service import HcloudTransport, HetznerService
+    from rdpm.hub import ProjectHub
+    from rdpm.projects import ProjectSpec, ProjectStore, ScopedConfig, ScopedCreds, project_id
     from rdpm.remote import SshRemote
 
     if args.fake:
         from rdpm.hetzner.fake import FakeCloud
         rdp.SIMULATE = True
-        fake = FakeCloud(speed=args.fake_speed, fail={f for f in args.fake_fail.split(",") if f},
-                         seed=args.fake_seed)
-        backend = HetznerService(fake, probe_fn=fake.probe, public_ip_fn=fake.public_ip, remote=fake.remote)
         creds: rdp.CredentialStore = rdp.MemoryCredentialStore()
         sim_dir = LOG_DIR.parent / "simulation"
         config = AppConfig.load(sim_dir / "config.json")
         sessions = SessionLog(sim_dir / "sessions.jsonl")
         mode = "fake"
-        token_source = None
+        store = None
+        fail = {f for f in args.fake_fail.split(",") if f}
+        seeds = ["demo", "account"]
+        specs = [ProjectSpec(f"sim{i + 1}", "Simulation" if i == 0 else f"Simulation {i + 1}", f"fake-token-{i + 1}",
+                             "fake") for i in range(max(1, args.fake_projects))]
+        primary = specs[0].id
+
+        def make_backend(spec: ProjectSpec) -> HetznerService:
+            seed = args.fake_seed if spec.id == primary else seeds[(int(spec.id[3:]) - 1) % 2] \
+                if spec.id.startswith("sim") else "account"
+            fake = FakeCloud(speed=args.fake_speed, fail=fail, seed=seed)
+            return HetznerService(fake, probe_fn=fake.probe, public_ip_fn=fake.public_ip, remote=fake.remote)
+
+        def verify(token: str) -> None:
+            if len(token) < 32:
+                raise ValueError("clé trop courte")
+
+        def namespace(pid: str) -> str:
+            return "" if pid == primary else f"{pid}:"
     else:
         mutex = notify.single_instance(APP_NAME)
         if mutex is None:
@@ -104,28 +131,41 @@ def main() -> int:
             mb.showwarning(APP_NAME, "L'application est déjà ouverte.")
             return 1
         creds = rdp.CredentialStore()
-        token, token_source = resolve_token(creds)
         config = AppConfig.load(CONFIG_PATH)
-        if token:
-            RedactFilter.secrets.append(token)
-        # Sans token, la fenêtre s'ouvre verrouillée sur la barre de saisie du token.
-        backend = HetznerService(HcloudTransport(token) if token else None, readonly=args.readonly,
-                                 remote=SshRemote())
         sessions = SessionLog(SESSIONS_PATH)
         mode = "readonly" if args.readonly else "live"
+        store = ProjectStore(config, creds)
+        # La clé du .env est toujours chargée en premier ; les autres viennent du Gestionnaire d'identifiants.
+        specs = store.load(*env_token())
+        for spec in specs:
+            RedactFilter.secrets.append(spec.token)
+
+        def make_backend(spec: ProjectSpec) -> HetznerService:
+            return HetznerService(HcloudTransport(spec.token), readonly=args.readonly, remote=SshRemote())
+
+        verify = HetznerService.verify_token
+        namespace = store.namespace
 
     ctk.set_appearance_mode(config.get("appearance"))
     ctk.set_default_color_theme("blue")
-    log.info("Démarrage (mode %s)", mode)
+    log.info("Démarrage (mode %s, %d projet(s))", mode, len(specs))
+
+    def make_controller(spec: ProjectSpec) -> AppController:
+        if mode == "fake" and spec.source != "fake":   # clé ajoutée en simulation : nouveau projet simulé
+            spec.id = project_id(spec.token)
+        ns = namespace(spec.id)
+        return AppController(make_backend(spec), ScopedConfig(config, ns), ScopedCreds(creds, ns), sessions,
+                             mode=mode, project=spec, on_secret=RedactFilter.secrets.append)
 
     from rdpm.ui.main_window import MainWindow
-    controller = AppController(backend, config, creds, sessions, mode=mode, token_source=token_source,
-                               on_secret=RedactFilter.secrets.append)
-    window = MainWindow(controller)
+    hub = ProjectHub(make_controller, verify, mode=mode)
+    for spec in specs:
+        hub.add(spec)
+    window = MainWindow(hub, store, on_secret=RedactFilter.secrets.append)
     try:
         window.mainloop()
     finally:
-        controller.shutdown()
+        hub.shutdown()
         logging.shutdown()
     os._exit(0)
 

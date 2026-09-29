@@ -14,7 +14,7 @@ from ...labels import slugify
 from ...models import Desktop
 from .. import theme as t
 from ..widgets import caption, ghost_button, label, primary_button, secondary_button
-from .base import Modal, confirm, confirm_typed, info
+from .base import CONFIRM_WORD, Modal, confirm, confirm_typed, info, is_confirm_word
 
 
 class LiveModal(Modal):
@@ -533,18 +533,19 @@ class DeleteDesktopDialog(Modal):
         if desktop.fixed_ip:
             ctk.CTkCheckBox(self.body, text=f"Rendre l'IP fixe {desktop.fixed_ip.ip}", variable=self.ip_var,
                             font=t.font(12)).pack(anchor="w", pady=(8, 0))
-        self.section(f"Tapez « {desktop.name} » pour confirmer")
+        self.section(f"Tapez {CONFIRM_WORD} pour confirmer")
         self.var = tk.StringVar()
-        entry = ctk.CTkEntry(self.body, textvariable=self.var, height=32, font=t.font(12))
+        entry = ctk.CTkEntry(self.body, textvariable=self.var, height=32, font=t.font(12),
+                             placeholder_text=CONFIRM_WORD)
         entry.pack(fill="x")
         self.ok = self.buttons(("Annuler", self.cancel, "secondary"), ("Supprimer définitivement", self._ok, "danger"))[1]
         self.ok.configure(state="disabled")
         self.var.trace_add("write", lambda *_: self.ok.configure(
-            state="normal" if self.var.get().strip() == desktop.name else "disabled"))
+            state="normal" if is_confirm_word(self.var.get()) else "disabled"))
         self.after(80, entry.focus_set)
 
     def _ok(self) -> None:
-        if self.var.get().strip() != self.desktop.name:
+        if not is_confirm_word(self.var.get()):
             return
         try:
             self.app.controller.delete_desktop(self.desktop.slug, self.vol_var.get(), self.ip_var.get())

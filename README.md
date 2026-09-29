@@ -10,19 +10,24 @@ Des bureaux Windows sur Hetzner Cloud **à la demande** : un bureau dort sous fo
 pip install -r requirements.txt
 ```
 
-Le token API Hetzner (en **lecture et écriture**) est cherché dans cet ordre :
+### Clés API et projets
 
-1. la variable d'environnement `HETZNER_TOKEN` ;
-2. le fichier `.env` placé à côté de `app.py` ;
-3. le Gestionnaire d'identifiants Windows.
+Une clé API Hetzner (en **lecture et écriture**) donne accès à un projet. L'application affiche **tous les projets
+ensemble** : cartes, coûts additionnés, bandeaux préfixés par le nom du projet, « Tout sauvegarder et quitter » global.
 
-S'il n'est trouvé nulle part, l'application s'ouvre bloquée sur la barre « Token Hetzner », en haut de la
-fenêtre, jusqu'à ce qu'un token soit saisi et accepté par Hetzner. Ce token reste en mémoire pour la session. Cochez
-« Mémoriser » pour l'enregistrer dans le Gestionnaire d'identifiants.
-
-Quand un token est chargé, la barre se réduit à une ligne (token masqué et provenance) :
-- « Changer » bascule sur un autre token et recharge le projet. C'est refusé tant qu'une opération est en cours.
-- « Oublier » retire le token du Gestionnaire d'identifiants.
+- La clé `HETZNER_TOKEN` du fichier `.env` (à côté de `app.py`) est **toujours chargée, en premier** ; à défaut, celle
+  de la variable d'environnement `HETZNER_TOKEN`. Elle ne se retire pas depuis l'application.
+- Les autres clés s'ajoutent avec « + Ajouter une clé API » dans la barre des projets, en haut de la fenêtre. Cochée par
+  défaut, « Mémoriser » les range dans le Gestionnaire d'identifiants (rechargées au démarrage suivant). Sinon elles
+  restent en mémoire pour la session.
+- Chaque projet peut être renommé ; « Retirer » le fait disparaître de l'application (ses serveurs restent chez
+  Hetzner) et supprime sa clé du Gestionnaire.
+- Sans aucune clé, l'application s'ouvre bloquée sur le formulaire de saisie.
+- **Clé refusée** (révoquée ou supprimée), au démarrage, à la saisie ou pendant une action : le projet n'est plus
+  interrogé et une fenêtre propose de supprimer la clé du Gestionnaire d'identifiants. Pour la clé du `.env`, elle
+  indique de la remplacer dans le fichier.
+- Les préférences et mots de passe des bureaux sont rangés par projet : deux bureaux de même nom dans deux projets ne se
+  mélangent pas.
 
 ## Lancement
 
@@ -33,6 +38,7 @@ Quand un token est chargé, la barre se réduit à une ligne (token masqué et p
 | `python app.py --readonly` | lit le vrai compte sans jamais rien modifier |
 | `python app.py --fake` | simulation complète (temps accéléré, aucun appel à Hetzner) |
 | `python app.py --fake --fake-fail=snapshot,shutdown_timeout` | simulation avec pannes injectées |
+| `python app.py --fake --fake-projects=2` | simulation avec deux projets |
 
 Pannes injectables : `snapshot`, `shutdown_timeout`, `resource_unavailable`, `delete`, `probe`, `change_type`, et pour
 la création d'un Windows de référence : `build_iso_missing`, `build_ssh_timeout`, `build_prepare`, `build_image_name`,
@@ -68,6 +74,14 @@ charge) — 36 min au total pour un Windows Server 2025 de 5,3 Go.
 
 - **Éditions** : Windows Server 2025 ou 2022 Évaluation (ISO Microsoft, licence d'évaluation de 180 jours,
   prolongeable avec `slmgr /rearm`), ou une ISO personnalisée (lien direct + nom d'image DISM, ta licence).
+- **Licence d'évaluation** : la carte du bureau affiche le compte à rebours (« Licence : 42 jours restants ») et
+  une alerte à moins de 15 jours. Une tâche planifiée installée pendant la construction prolonge la licence au
+  démarrage quand il reste moins de 15 jours (`slmgr /rearm`, puis un redémarrage avant que tu te connectes), tant
+  que des prolongations restent. À l'expiration, rien n'est effacé, mais Windows s'éteint seul au bout d'une heure.
+  L'application ne voit pas l'intérieur de Windows : elle suit la date par des labels Hetzner et applique la même
+  règle que la tâche ; `slmgr /dli` dans Windows donne la valeur exacte, et le journal de la tâche est dans
+  `C:\ProgramData\rdpm\eval-rearm.log`. Pour un bureau créé avant cette fonction : menu ⋯ → *Licence
+  d'évaluation…* donne le bloc PowerShell à coller dans la session.
 - **Disque** : le snapshot aura le disque du type choisi pour la construction. Plus il est petit, plus tu gardes le
   choix des types les moins chers au lancement.
 - **Sécurité** : reinstall.sh est figé à un commit précis et vérifié par SHA-256 avant d'être exécuté ; la clé SSH est
@@ -84,7 +98,7 @@ charge) — 36 min au total pour un Windows Server 2025 de 5,3 Go.
 - **Connecter** : un clic ouvre mstsc déjà authentifié. La connexion peut aussi se faire automatiquement dès que Windows répond.
 - **Sauvegarder & fermer** : arrêt propre de Windows, snapshot vérifié, suppression du serveur, rétention des anciennes versions.
 - **Sauvegarder (reste allumé)** : snapshot puis redémarrage automatique.
-- **Fermer sans sauvegarder** : suppression immédiate, après avoir tapé le nom du bureau pour confirmer.
+- **Fermer sans sauvegarder** : suppression immédiate, après avoir tapé CONFIRM (majuscules ou minuscules) pour confirmer. Les autres suppressions (volume, sauvegarde, bureau) demandent la même confirmation.
 - **Menu ⋯** : volumes, pare-feu, IP fixe, historique des sauvegardes, duplication, renommage, identifiants, suppression.
 
 Plusieurs bureaux peuvent tourner en même temps ; chaque carte suit son propre état.

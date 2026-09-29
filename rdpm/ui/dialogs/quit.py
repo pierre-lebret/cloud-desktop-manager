@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 import customtkinter as ctk
 
 from ... import fmt
-from ...controller import QuitState
 from ...pricing import server_burn, session_cost
 from .. import theme as t
 from ..widgets import caption, ghost_button, label
@@ -22,11 +21,10 @@ class QuitDialog(Modal):
 
     def __init__(self, app) -> None:
         super().__init__(app, "Des serveurs sont encore allumés", width=720)
-        ctrl = app.controller
-        servers = ctrl.billed_servers()
-        ops = [op for op in ctrl.runner.active()]
+        hub = app.hub
+        servers = hub.billed_servers()
+        ops = [op for _, op in hub.active_ops()]
         now = datetime.now(timezone.utc)
-        pricing = ctrl.static.pricing if ctrl.static else None
         n = len(servers)
         self.heading(f"{n} serveur{'s' if n > 1 else ''} toujours facturé{'s' if n > 1 else ''}" if n
                      else "Des opérations sont en cours",
@@ -39,9 +37,12 @@ class QuitDialog(Modal):
             for col, text_ in enumerate(heads):
                 caption(table, text_).grid(row=0, column=col, sticky="w", padx=10, pady=(10, 4))
             total = 0.0
-            for row, srv in enumerate(servers, 1):
+            for row, (ctrl, srv) in enumerate(servers, 1):
+                pricing = ctrl.static.pricing if ctrl.static else None
                 d = next((d for d in ctrl.grouping.desktops if d.server and d.server.id == srv.id), None)
                 name = d.name if d else f"{srv.name} (non géré)"
+                if hub.multi:
+                    name = f"{name} · {ctrl.project.name}"
                 burn = server_burn(srv, pricing) if pricing else srv.price_hourly
                 total += burn
                 cells = [name, f"{srv.server_type} · {srv.location}", fmt.status(srv.status),
@@ -54,7 +55,7 @@ class QuitDialog(Modal):
             label(table, f"Total : {fmt.eur_h(total)} · ≈ {fmt.eur(total * 24)} par jour si rien n'est fait", 12,
                   "bold", color=t.tone("warning")[0]).grid(row=len(servers) + 1, column=0, columnspan=6,
                                                           sticky="w", padx=10, pady=(6, 10))
-            unmanaged = [s for s in servers if not s.managed]
+            unmanaged = [s for _, s in servers if not s.managed]
             if unmanaged:
                 self.notice("Les serveurs non gérés ne seront pas touchés et resteront allumés.", "warning")
         if ops:
@@ -71,8 +72,8 @@ class QuitProgressDialog(Modal):
 
     def __init__(self, app) -> None:
         super().__init__(app, "Sauvegarde avant fermeture", width=640)
-        self.app, self.ctrl = app, app.controller
-        self.qs = QuitState()
+        self.app, self.hub = app, app.hub
+        self.states = self.hub.new_quit_states()
         self.protocol("WM_DELETE_WINDOW", self._quit_now)
         self.unbind("<Escape>")
         self.heading("Sauvegarde de tous les bureaux",
@@ -91,14 +92,14 @@ class QuitProgressDialog(Modal):
     def _step(self) -> None:
         if not self.winfo_exists():
             return
-        rows, done = self.ctrl.quit_step(self.qs)
+        rows, done = self.hub.quit_step(self.states)
         signature = [(r.slug, r.status, r.detail, round(r.progress or 0, 2), r.error.message if r.error else None)
                      for r in rows]
         if signature != self._signature:
             self._signature = signature
             self._render(rows)
         if done:
-            skipped = len(self.qs.skipped)
+            skipped = sum(len(qs.skipped) for qs in self.states.values())
             self.status.configure(text="Tout est sauvegardé — 0,00 €/h. Fermeture…" if not skipped else
                                   f"Terminé ({skipped} bureau{'x' if skipped > 1 else ''} laissé"
                                   f"{'s' if skipped > 1 else ''} allumé{'s' if skipped > 1 else ''}). Fermeture…",
@@ -144,18 +145,18 @@ class QuitProgressDialog(Modal):
                                  font=t.font(12, "bold")).pack(side="left", padx=2)
         self.refit()
 
-    def _retry(self, slug: str) -> None:
-        self.ctrl.quit_retry(self.qs, slug)
+    def _retry(self, key: str) -> None:
+        self.hub.quit_retry(self.states, key)
         self._signature = None
 
-    def _discard(self, slug: str, name: str) -> None:
+    def _discard(self, key: str, name: str) -> None:
         if confirm_typed(self, "Fermer sans sauvegarder", "Toutes les modifications depuis la dernière sauvegarde "
                          "de ce bureau seront définitivement perdues.", name, "Supprimer le serveur"):
-            self.ctrl.quit_discard(self.qs, slug)
+            self.hub.quit_discard(self.states, key)
             self._signature = None
 
-    def _skip(self, slug: str) -> None:
-        self.qs.skipped.add(slug)
+    def _skip(self, key: str) -> None:
+        self.hub.quit_skip(self.states, key)
         self._signature = None
 
     def _back(self) -> None:

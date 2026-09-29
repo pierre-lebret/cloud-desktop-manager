@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from datetime import date
 
-from .. import netutil, rdp
+from .. import license, netutil, rdp
 from ..constants import (
     DEFAULT_FIREWALL_NAME, L_IMAGE, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_ROLE, OP_LABELS, OP_LAUNCHING,
     ROLE_DESKTOP, ROLE_RDP_FIREWALL,
@@ -53,6 +54,7 @@ class LaunchOp(Operation):
         labels = desktop_labels(self.slug, **{
             L_ROLE: ROLE_DESKTOP, L_IMAGE: p.snapshot_id, L_OP: OP_LAUNCHING,
             L_OP_TS: int(time.time()), L_OP_HOST: self.ctx.host})
+        labels.update(self._eval_labels())
         self.set_phase(f"Création du serveur ({create_type}, {p.location})…", 0)
         server, action_ids = backend.create_server(
             name=server_name(self.slug), server_type=create_type, image_id=p.snapshot_id,
@@ -77,6 +79,20 @@ class LaunchOp(Operation):
             rdp.write_rdp_file(self.slug, ip, p.rdp_user)
         self.result = {"server_id": server.id, "ip": ip, "auto_connect": p.auto_connect}
         self.success_message = f"« {self.name} » démarre ({ip or 'sans IPv4'}) — Windows arrive…"
+
+    def _eval_labels(self) -> dict[str, str]:
+        """Licence d'évaluation du snapshot lancé, telle qu'elle sera après le démarrage (prolongation auto)."""
+        try:
+            snap = self.ctx.backend.get_image(self.params.snapshot_id)
+        except Exception:  # noqa: BLE001 - le suivi de licence ne doit jamais bloquer un lancement
+            return {}
+        lic = license.from_labels(snap.labels) if snap else None
+        if lic is None:
+            return {}
+        lic, rearmed = license.at_boot(lic, date.today())
+        if rearmed:
+            self.log("Licence d'évaluation : prolongée automatiquement au démarrage (180 jours, un redémarrage de plus)")
+        return license.to_labels(lic)
 
     def _prepare_firewall(self) -> int | None:
         p, backend = self.params, self.ctx.backend

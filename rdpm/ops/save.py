@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from ..constants import (
-    L_FORCED, L_LOC, L_OP_IMAGE, L_SRC_SERVER, L_TYPE, OP_CHECKPOINT, OP_DISCARDING, OP_SAVING,
+    EVAL_LABELS, L_FORCED, L_LOC, L_OP_IMAGE, L_SRC_SERVER, L_TYPE, OP_CHECKPOINT, OP_DISCARDING, OP_SAVING,
 )
 from ..hetzner.errors import UserError
 from ..hetzner.waiting import wait_actions
@@ -64,6 +64,7 @@ class SaveOp(Operation):
         self.set_phase("Snapshot : démarrage…", 0)
         labels = desktop_labels(self.slug, **{L_SRC_SERVER: srv.id, L_TYPE: srv.server_type,
                                               L_LOC: srv.location, L_FORCED: int(self.forced)})
+        labels.update({k: v for k, v in srv.labels.items() if k in EVAL_LABELS})   # licence d'évaluation
         image_id, action_id = backend.create_snapshot(
             srv.id, format_description(self.name, datetime.now(timezone.utc)), labels)
         backend.update_server_labels(srv.id, {L_OP_IMAGE: image_id})

@@ -53,7 +53,6 @@ class InventoryLoaded:
     inventory: Inventory | None
     error: Exception | None = None
     started: float = 0.0
-    token_gen: int = 0
 
 
 @dataclass

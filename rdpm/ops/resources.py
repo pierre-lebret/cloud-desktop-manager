@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .. import fmt, netutil
 from ..constants import (
-    DEFAULT_FIREWALL_NAME, L_MANAGED, L_ROLE, OP_LABELS, ROLE_DESKTOP, ROLE_RDP_FIREWALL,
+    DEFAULT_FIREWALL_NAME, L_EVAL_AUTO, L_MANAGED, L_ROLE, OP_LABELS, ROLE_DESKTOP, ROLE_RDP_FIREWALL,
 )
 from ..hetzner.waiting import wait_actions
 from ..labels import desktop_labels, format_description, parse_description
@@ -181,6 +181,19 @@ class AdoptServerOp(Operation):
     def execute(self) -> None:
         self.ctx.backend.update_server_labels(self.server.id, desktop_labels(self.slug, **{L_ROLE: ROLE_DESKTOP}))
         self.success_message = f"Serveur {self.server.name} géré comme « {self.name} »"
+
+
+class EvalAutoOp(Operation):
+    title = "Licence d'évaluation"
+
+    def __init__(self, ctx: OpContext, slug: str, name: str, server_id: int):
+        super().__init__(ctx, slug, name)
+        self.server_id = server_id
+
+    def execute(self) -> None:
+        self.ctx.backend.update_server_labels(self.server_id, {L_EVAL_AUTO: "1"})
+        self.success_message = (f"« {self.name} » : prolongation automatique notée — elle sera enregistrée "
+                                "à la prochaine sauvegarde")
 
 
 class RenameOp(Operation):

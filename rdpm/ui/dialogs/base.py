@@ -11,11 +11,18 @@ from .. import theme as t
 from ..widgets import danger_button, danger_outline_button, label, notice, primary_button, secondary_button
 
 _STACK: list["Modal"] = []
+CONFIRM_WORD = "CONFIRM"
+
+
+def is_confirm_word(text: str) -> bool:
+    """Confirmation des actions destructrices : « CONFIRM », sans tenir compte de la casse."""
+    return text.strip().upper() == CONFIRM_WORD
 
 
 def top_window(root):
+    """Fenêtre au premier plan. `root` peut être une vue projet (ProjectScope) : on prend sa vraie fenêtre."""
     alive = [m for m in _STACK if m.winfo_exists()]
-    return alive[-1] if alive else root
+    return alive[-1] if alive else getattr(root, "tk_root", root)
 
 
 class Modal(ctk.CTkToplevel):
@@ -141,7 +148,7 @@ class ConfirmDialog(Modal):
 
 
 class TypedConfirmDialog(Modal):
-    """Niveau 3 : le bouton rouge ne s'active qu'une fois le nom exact saisi."""
+    """Niveau 3 : le bouton rouge ne s'active qu'une fois « CONFIRM » saisi (casse indifférente)."""
 
     def __init__(self, master, title: str, message: str, expected: str, ok_text: str,
                  lost: list[str] = (), kept: list[str] = ()) -> None:
@@ -157,19 +164,20 @@ class TypedConfirmDialog(Modal):
             self.section("Sera conservé")
             for line in kept:
                 label(self.body, f"✓  {line}", 12, color=t.tone("success")[0], wraplength=480).pack(fill="x")
-        self.section(f"Tapez « {expected} » pour confirmer")
+        self.section(f"Tapez {CONFIRM_WORD} pour confirmer")
         self.var = tk.StringVar()
-        entry = ctk.CTkEntry(self.body, textvariable=self.var, height=34, font=t.font(13))
+        entry = ctk.CTkEntry(self.body, textvariable=self.var, height=34, font=t.font(13),
+                             placeholder_text=CONFIRM_WORD)
         entry.pack(fill="x")
         self.ok = self.buttons(("Annuler", self.cancel, "secondary"), (ok_text, self._confirm, "danger"))[1]
         self.ok.configure(state="disabled")
         self.var.trace_add("write", lambda *_: self.ok.configure(
-            state="normal" if self.var.get().strip() == expected else "disabled"))
+            state="normal" if is_confirm_word(self.var.get()) else "disabled"))
         entry.bind("<Return>", lambda _e: self._confirm())
         self.after(80, entry.focus_set)
 
     def _confirm(self) -> None:
-        if self.var.get().strip() == self.expected:
+        if is_confirm_word(self.var.get()):
             self.close(True)
 
 

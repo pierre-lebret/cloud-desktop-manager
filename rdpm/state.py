@@ -80,6 +80,7 @@ class Act(str, Enum):
     RESUME = "resume"
     IGNORE_OP = "ignore_op"
     RESOLVE = "resolve"
+    LICENSE = "license"
     CANCEL_OP = "cancel_op"
 
 
@@ -105,17 +106,18 @@ ACT_LABELS: dict[Act, str] = {
     Act.RESUME: "Reprendre",
     Act.IGNORE_OP: "Ignorer l'opération",
     Act.RESOLVE: "Résoudre…",
+    Act.LICENSE: "Licence d'évaluation…",
     Act.CANCEL_OP: "Annuler",
 }
 
 _RUNNING_ACTS = [Act.CONNECT, Act.SAVE_CLOSE, Act.CHECKPOINT, Act.DISCARD, Act.ADD_VOLUME,
                  Act.VOLUMES, Act.FIREWALL, Act.COPY_IP, Act.COPY_PASSWORD, Act.REBOOT,
-                 Act.CREDENTIALS, Act.HISTORY, Act.RENAME]
+                 Act.CREDENTIALS, Act.HISTORY, Act.RENAME, Act.LICENSE]
 
 _ALLOWED: dict[DState, list[Act]] = {
     DState.EMPTY: [Act.CREDENTIALS, Act.DELETE],
     DState.ARCHIVED: [Act.LAUNCH, Act.HISTORY, Act.DUPLICATE, Act.RENAME, Act.VOLUMES, Act.FIXED_IP,
-                      Act.CREDENTIALS, Act.DELETE],
+                      Act.CREDENTIALS, Act.LICENSE, Act.DELETE],
     DState.SNAPSHOT_PENDING: [Act.HISTORY],
     DState.PENDING: [],
     DState.LAUNCHING: [Act.CANCEL_OP],

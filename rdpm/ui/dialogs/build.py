@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import tkinter as tk
 from dataclasses import replace
+from datetime import date
 
 import customtkinter as ctk
 
-from ... import fmt, netutil
+from ... import fmt, license, netutil
 from ...build import catalog
+from ...build.scripts import render_eval_task_install
+from ...constants import EVAL_ALERT_DAYS
 from ...labels import slugify
 from ...models import Offer
 from ...offers import compatible_offers
@@ -334,8 +337,9 @@ class BuildDoneDialog(Modal):
                      "Gestionnaire de serveur silencieux au démarrage"):
             label(self.body, f"•  {line}", 12, color=t.MUTED, wraplength=500).pack(fill="x", padx=(6, 0), pady=(2, 0))
         if ed and not ed.custom:
-            self.notice(f"Licence d'évaluation Microsoft : {ed.eval_days} jours. Dans Windows, « slmgr /rearm » "
-                        "(PowerShell administrateur) la prolonge jusqu'à 5 fois.", "info", pady=(12, 0))
+            self.notice(f"Licence d'évaluation Microsoft : {ed.eval_days} jours, prolongée automatiquement au "
+                        f"démarrage quand il reste moins de {EVAL_ALERT_DAYS} jours. Le compte à rebours est "
+                        "affiché sur la carte du bureau.", "info", pady=(12, 0))
         else:
             self.notice("ISO personnalisée : pense à activer Windows avec ta licence.", "info", pady=(12, 0))
         self.launch_btn = self.buttons(("Fermer", self.cancel, "secondary"),
@@ -358,3 +362,61 @@ class BuildDoneDialog(Modal):
         self.close(True)
         if d:
             self.app.open_launch(d)
+
+
+class LicenseDialog(Modal):
+    """État de la licence d'évaluation d'un bureau, et installation manuelle de la prolongation automatique
+    pour les bureaux créés avant cette fonction (ou importés)."""
+
+    def __init__(self, app, slug: str) -> None:
+        self.app, self.ctrl, self.slug = app, app.controller, slug
+        d = self.ctrl.desktop(slug)
+        lic = self.ctrl.eval_license(d) if d else None
+        super().__init__(app, "Licence d'évaluation", width=640)
+        name = d.name if d else slug
+        self.heading(f"Licence d'évaluation — « {name} »")
+        if lic is None:
+            self.text("Aucune licence d'évaluation suivie pour ce bureau.", t.MUTED, 12)
+            self.buttons(("Fermer", self.cancel, "primary"))
+            return
+        today = date.today()
+        self.text(license.summary(lic, today), t.TEXT, 12)
+        note = license.alert(lic, today)
+        if note:
+            self.notice(note, "warning", pady=(10, 0))
+        self.text("À l'expiration, rien n'est effacé, mais Windows s'éteint seul au bout d'une heure d'utilisation. "
+                  "« slmgr /rearm » redonne 180 jours, un nombre limité de fois. La date affichée est suivie par "
+                  "l'application (Windows ne lui est pas accessible) : « slmgr /dli » donne la valeur exacte.",
+                  t.MUTED, 11, pady=(10, 0))
+        if lic.auto:
+            self.text(f"Prolongation automatique installée : au démarrage, s'il reste moins de {EVAL_ALERT_DAYS} "
+                      "jours, Windows se prolonge puis redémarre avant ta connexion. Journal : "
+                      r"C:\ProgramData\rdpm\eval-rearm.log", t.MUTED, 11, pady=(8, 0))
+            self.buttons(("Fermer", self.cancel, "primary"))
+            return
+        self.section("Installer la prolongation automatique")
+        running = bool(d and d.server)
+        self.text(("1. Dans la session du bureau, ouvre PowerShell en administrateur et colle ce bloc.\n"
+                   "2. Clique ensuite sur « C'est installé » : l'information sera enregistrée à la prochaine "
+                   "sauvegarde.") if running else
+                  "Lance d'abord le bureau : la tâche s'installe dans Windows (PowerShell administrateur).",
+                  t.TEXT, 12)
+        code = render_eval_task_install(EVAL_ALERT_DAYS)
+        box = ctk.CTkTextbox(self.body, height=180, font=t.mono(11), fg_color=t.SURFACE_2, wrap="none")
+        box.insert("1.0", code)
+        box.configure(state="disabled")
+        box.pack(fill="x", pady=(8, 0))
+        _, copy_btn, done_btn = self.buttons(("Fermer", self.cancel, "secondary"),
+                                             ("Copier le bloc", lambda: self._copy(code), "secondary"),
+                                             ("C'est installé", self._done, "primary"))
+        if not running:
+            done_btn.configure(state="disabled")
+
+    def _copy(self, code: str) -> None:
+        self.clipboard_clear()
+        self.clipboard_append(code)
+        self.app.toast("Bloc PowerShell copié", "info")
+
+    def _done(self) -> None:
+        if self.app._safe(self.ctrl.mark_eval_auto, self.slug) is not None:
+            self.close(True)

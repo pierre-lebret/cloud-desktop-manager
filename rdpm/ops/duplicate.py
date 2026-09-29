@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ..constants import L_LOC, L_ROLE, L_SRC_SERVER, L_TYPE, ROLE_TMP
+from ..constants import EVAL_LABELS, L_LOC, L_ROLE, L_SRC_SERVER, L_TYPE, ROLE_TMP
 from ..hetzner.errors import UserError
 from ..hetzner.waiting import wait_actions, wait_server_status
 from ..labels import desktop_labels, format_description, tmp_server_name
@@ -52,6 +52,7 @@ class DuplicateOp(Operation):
             self.set_phase("Copie du snapshot…", 0)
             labels = desktop_labels(self.slug, **{L_SRC_SERVER: srv.id, L_TYPE: snap.labels.get(L_TYPE, stype.name),
                                                   L_LOC: snap.labels.get(L_LOC, location)})
+            labels.update({k: v for k, v in snap.labels.items() if k in EVAL_LABELS})
             image_id, action_id = backend.create_snapshot(
                 srv.id, format_description(self.name, datetime.now(timezone.utc)), labels)
             wait_snapshot_ready(self, image_id, action_id)

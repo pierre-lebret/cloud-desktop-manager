@@ -33,6 +33,15 @@ L_FORCED = "rdpm-forced"
 
 OP_LABELS = (L_OP, L_OP_TS, L_OP_HOST, L_OP_IMAGE)
 
+# Licence d'évaluation Windows Server, suivie par l'application (Windows ne lui est pas accessible) :
+# date d'expiration AAAAMMJJ, prolongations restantes, tâche de prolongation automatique installée.
+L_EVAL_EXP = "rdpm-eval-exp"
+L_EVAL_REARMS = "rdpm-eval-rearms"
+L_EVAL_AUTO = "rdpm-eval-auto"
+EVAL_LABELS = (L_EVAL_EXP, L_EVAL_REARMS, L_EVAL_AUTO)
+EVAL_PERIOD_DAYS = 180
+EVAL_ALERT_DAYS = 15     # alerte sur la carte et seuil de la prolongation automatique
+
 ROLE_DESKTOP = "desktop"
 ROLE_TMP = "tmp"
 ROLE_RDP_FIREWALL = "rdp"

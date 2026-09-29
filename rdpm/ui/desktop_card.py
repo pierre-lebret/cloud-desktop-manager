@@ -16,7 +16,7 @@ MENU_GROUPS = [
     [Act.CONNECT, Act.COPY_IP, Act.COPY_PASSWORD],
     [Act.CHECKPOINT, Act.SAVE_CLOSE, Act.RESUME],
     [Act.ADD_VOLUME, Act.VOLUMES, Act.FIREWALL, Act.FIXED_IP],
-    [Act.HISTORY, Act.DUPLICATE, Act.RENAME, Act.CREDENTIALS],
+    [Act.HISTORY, Act.DUPLICATE, Act.RENAME, Act.CREDENTIALS, Act.LICENSE],
     [Act.POWER_ON, Act.REBOOT],
     [Act.IGNORE_OP, Act.DISCARD, Act.DELETE],
 ]
@@ -86,12 +86,15 @@ class DesktopCard(ctk.CTkFrame):
         self.volume_row = _Row(self, 5, "Volumes")
         self.volumes = label(self.volume_row.value, "", 12)
         self.volumes.pack(fill="x")
+        self.license_row = _Row(self, 6, "Licence")
+        self.license = label(self.license_row.value, "", 12)
+        self.license.pack(fill="x")
 
         self.note_box = ctk.CTkFrame(self, fg_color=t.tone("warning")[1], corner_radius=8)
         self.note = ctk.CTkLabel(self.note_box, text="", font=t.font(12), text_color=t.tone("warning")[0],
                                  justify="left", anchor="w")
         self.note.pack(fill="x", padx=10, pady=7)
-        self.note_box.grid(row=6, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 0))
+        self.note_box.grid(row=7, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 0))
 
         self.progress_box = ctk.CTkFrame(self, fg_color=t.SURFACE_2, corner_radius=8)
         self.progress_box.grid_columnconfigure(0, weight=1)
@@ -103,7 +106,7 @@ class DesktopCard(ctk.CTkFrame):
         self.bar.grid(row=1, column=0, columnspan=2, sticky="ew", padx=12, pady=(2, 10))
         self.cancel_btn = ghost_button(self.progress_box, "Annuler", lambda: self._act(Act.CANCEL_OP), width=70,
                                        text_color=t.tone("danger")[0])
-        self.progress_box.grid(row=7, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 0))
+        self.progress_box.grid(row=8, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 0))
         self._bar_mode = None
 
         self.error_box = ctk.CTkFrame(self, fg_color=t.tone("danger")[1], corner_radius=8)
@@ -116,10 +119,10 @@ class DesktopCard(ctk.CTkFrame):
         self.error_hint.grid(row=1, column=0, sticky="ew", padx=10)
         self.error_actions = ctk.CTkFrame(self.error_box, fg_color="transparent", height=1)
         self.error_actions.grid(row=2, column=0, sticky="w", padx=6, pady=(4, 8))
-        self.error_box.grid(row=8, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 0))
+        self.error_box.grid(row=9, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 0))
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
-        actions.grid(row=9, column=0, columnspan=2, sticky="ew", padx=18, pady=(14, 16))
+        actions.grid(row=10, column=0, columnspan=2, sticky="ew", padx=18, pady=(14, 16))
         actions.grid_columnconfigure(2, weight=1)
         self.primary = primary_button(actions, "", lambda: self._act(self.view.primary), width=130)
         self.secondary = secondary_button(actions, "", lambda: self._act(self.view.secondary), width=170)
@@ -153,6 +156,8 @@ class DesktopCard(ctk.CTkFrame):
         self._set("backup", v.backup, lambda x: self.backup.configure(text=x))
         self.volume_row.show(bool(v.volumes))
         self._set("volumes", tuple(v.volumes), lambda x: self.volumes.configure(text="\n".join(x)))
+        self.license_row.show(bool(v.license))
+        self._set("license", v.license, lambda x: self.license.configure(text=x or ""))
 
         self._set("note", v.note, self._apply_note)
         self._apply_progress(v)
@@ -205,12 +210,14 @@ class DesktopCard(ctk.CTkFrame):
         specs = [ERROR_ACTIONS[code]] if code in ERROR_ACTIONS else []
         specs.append(("Masquer", "dismiss"))
         for text_, key in specs:
-            ghost_button(self.error_actions, text_, lambda k=key: self.on_error_action(self.view.slug, k),
+            ghost_button(self.error_actions, text_, lambda k=key: self.on_error_action(self.view.key, k),
                          width=10, text_color=t.tone("danger")[0], font=t.font(12, "bold")).pack(side="left",
                                                                                               padx=2)
         self.error_box.grid()
 
     def _apply_buttons(self, v: DesktopView) -> None:
+        self._set("primary_disabled", v.primary_disabled,
+                  lambda off: self.primary.configure(state="disabled" if off else "normal"))
         if v.primary != self._primary_act:
             self._primary_act = v.primary
             if v.primary:
@@ -233,7 +240,7 @@ class DesktopCard(ctk.CTkFrame):
         width = int(logical(self, event.width))
         if self._last.get("wrap") != width:
             self._last["wrap"] = width
-            for lbl in (self.session, self.backup, self.volumes):
+            for lbl in (self.session, self.backup, self.volumes, self.license):
                 lbl.configure(wraplength=max(160, width - 150))
             for lbl in (self.spec, self.note, self.error_msg, self.error_hint):
                 lbl.configure(wraplength=max(160, width - 70))
@@ -241,7 +248,7 @@ class DesktopCard(ctk.CTkFrame):
     # --- actions ----------------------------------------------------------------------------
     def _act(self, act: Act | None) -> None:
         if act and self.view:
-            self.on_action(self.view.slug, act)
+            self.on_action(self.view.key, act)
 
     def _open_menu(self) -> None:
         if not self.view:

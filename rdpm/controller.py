@@ -11,13 +11,13 @@ import logging
 import math
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from queue import Empty, SimpleQueue
 from typing import Callable
 
-from . import fmt, netutil, rdp
+from . import fmt, license, netutil, rdp
 from .config import AppConfig, SessionLog
 from .constants import (
     L_LOC, L_OP_TS, L_TYPE, OP_BUILDING, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING,
@@ -31,6 +31,7 @@ from .hetzner.errors import UserError, to_user_error
 from .labels import host_label, slugify, unique_slug
 from .models import Desktop, FirewallInfo, Inventory, PrimaryIpInfo, ServerInfo, SnapshotInfo, StaticData, VolumeInfo
 from .offers import best_by_location
+from .projects import ProjectSpec
 from .ops.base import OpContext, Operation
 from .ops.build import BuildOp, BuildParams
 from .ops.duplicate import DuplicateOp
@@ -38,7 +39,7 @@ from .ops.launch import LaunchOp, LaunchParams
 from .ops.resources import (
     AddVolumeOp, AdoptFirewallOp, AdoptServerOp, AdoptSnapshotOp, ApplyFirewallOp, CleanupOp,
     ClearOpLabelsOp, CreateFirewallOp, DeleteDesktopOp, FirewallOp, FixedIpOp, PowerOp, RenameOp,
-    SnapshotActionOp, VolumeActionOp,
+    EvalAutoOp, SnapshotActionOp, VolumeActionOp,
 )
 from .ops.runner import BusyError, OperationRunner
 from .ops.save import DiscardOp, ResumeOp, SaveOp
@@ -57,7 +58,8 @@ TRANSITIONAL = {DState.BOOTING, DState.STOPPING, DState.SNAPSHOT_PENDING, DState
 
 OP_NAMES_FR = {OP_SAVING: "sauvegarde", OP_CHECKPOINT: "sauvegarde", OP_DISCARDING: "fermeture",
                OP_LAUNCHING: "lancement", "duplicating": "duplication", OP_BUILDING: "construction"}
-PLACEHOLDER_KINDS = ("launch", "duplicate", "build")   # opérations qui font naître une carte sans snapshot
+PLACEHOLDER_KINDS = ("launch", "duplicate", "build")
+LAUNCH_GRACE_S = 180   # délai max pour voir apparaître dans l'inventaire un serveur tout juste créé   # opérations qui font naître une carte sans snapshot
 
 
 @dataclass
@@ -82,6 +84,7 @@ class DesktopView:
     burn: str | None = None
     backup: str = ""
     volumes: list[str] = field(default_factory=list)
+    license: str | None = None      # ligne « Licence » (évaluation Windows Server)
     note: str | None = None
     op_phase: str | None = None
     op_progress: float | None = None
@@ -90,7 +93,10 @@ class DesktopView:
     error: UserError | None = None
     actions: list[Act] = field(default_factory=list)
     primary: Act | None = None
+    primary_disabled: bool = False
     secondary: Act | None = None
+    key: str = ""            # « <projet>/<slug> » : identifiant unique dans l'interface
+    project: str = ""
 
 
 @dataclass
@@ -129,16 +135,14 @@ class QuitRow:
 
 
 class AppController:
+    """Un projet Hetzner (une clé API). Plusieurs contrôleurs cohabitent, rassemblés par ProjectHub."""
+
     def __init__(self, backend, config: AppConfig, creds: CredentialStore, sessions: SessionLog,
-                 mode: str = "live", token_source: str | None = None,
-                 on_secret: Callable[[str], None] | None = None) -> None:
+                 mode: str = "live", project=None, on_secret: Callable[[str], None] | None = None) -> None:
         self.backend, self.config, self.creds, self.sessions = backend, config, creds, sessions
         self.mode = mode
-        # Sans token, rien ne part vers Hetzner tant que l'utilisateur n'en a pas validé un.
-        self.token_source = token_source
-        self.locked = backend.transport is None
-        self._on_secret = on_secret
-        self._token_gen = 0
+        self.project = project or ProjectSpec("local", "Projet", "", "fake")
+        self.token_invalid = False   # clé refusée par Hetzner : plus aucun appel pour ce projet
         self.host = host_label()
         self.queue: SimpleQueue = SimpleQueue()
         self.hard_stop = threading.Event()
@@ -169,6 +173,8 @@ class AppController:
         self.probes: dict[int, ProbeInfo] = {}
         self.errors: dict[str, UserError] = {}
         self.pending_autoconnect: set[str] = set()
+        # Serveur créé mais pas encore dans l'inventaire : la carte reste « Création… » (pas de 2e lancement).
+        self.launched: dict[str, tuple[int, float]] = {}
         self.failed_launch: dict[str, tuple[str, str]] = {}
         self.reminder_at: dict[int, float] = {}
         self.dismissed: set[str] = set()
@@ -195,7 +201,7 @@ class AppController:
             self._ip_inflight = True
             self._next_ip = now + PUBLIC_IP_REFRESH_S
             self._bg.submit(self._task_public_ip)
-        if self.locked:
+        if self.token_invalid:
             return
         if self.static is None or now >= self._next_static:
             self._load_static()
@@ -209,13 +215,13 @@ class AppController:
             self._refresh_again = True
             return
         self._refresh_inflight = True
-        self._bg.submit(self._task_refresh, time.monotonic(), self._token_gen)
+        self._bg.submit(self._task_refresh, time.monotonic())
 
-    def _task_refresh(self, started: float, token_gen: int) -> None:
+    def _task_refresh(self, started: float) -> None:
         try:
-            self.queue.put(InventoryLoaded(self.backend.fetch_inventory(), None, started, token_gen))
+            self.queue.put(InventoryLoaded(self.backend.fetch_inventory(), None, started))
         except Exception as exc:  # noqa: BLE001
-            self.queue.put(InventoryLoaded(None, exc, started, token_gen))
+            self.queue.put(InventoryLoaded(None, exc, started))
 
     def _task_static(self) -> None:
         try:
@@ -294,16 +300,14 @@ class AppController:
 
     def _on_inventory(self, ev: InventoryLoaded) -> bool:
         self._refresh_inflight = False
-        if ev.token_gen != self._token_gen:  # lancé avec l'ancien token
-            self._refresh_again = False
-            self.refresh_now()
-            return False
         if ev.error is not None:
             self._next_refresh = time.monotonic() + REFRESH_IDLE_S
             first = self.refresh_error is None
             self.refresh_error = to_user_error(ev.error)
             if first:
                 self._log("error", f"Rafraîchissement impossible : {self.refresh_error}")
+            if self.refresh_error.code == "unauthorized":
+                self._token_rejected()
             return True
         if ev.started < self._invalidated_at:
             self._refresh_again = True
@@ -311,6 +315,9 @@ class AppController:
             self.refresh_error = None
             self.inventory = ev.inventory
             self.inventory_version += 1
+            known = {s.id for s in ev.inventory.servers}
+            self.launched = {slug: (sid, t) for slug, (sid, t) in self.launched.items()
+                             if sid not in known and time.monotonic() - t < LAUNCH_GRACE_S}
             self.last_refresh = time.monotonic()
             self._last_refresh_started = ev.started
             self._regroup()
@@ -350,11 +357,15 @@ class AppController:
                 self.errors[op.slug] = op.error
             elif op.outcome == "ok":
                 self.errors.pop(op.slug, None)
+        if op.outcome == "failed" and op.error and op.error.code == "unauthorized":
+            self._token_rejected()
         if op.outcome == "ok":
             if op.success_message and self.ui:
                 self.ui.toast(op.success_message, "success")
             if op.kind == "launch" and op.result.get("auto_connect"):
                 self.pending_autoconnect.add(op.slug)
+            if op.kind == "launch" and op.result.get("server_id"):
+                self.launched[op.slug] = (op.result["server_id"], time.monotonic())
             if op.kind in ("launch", "checkpoint") or isinstance(op, PowerOp):
                 sid = op.result.get("server_id") or getattr(op, "server_id", None)
                 if sid:
@@ -447,8 +458,14 @@ class AppController:
     def desktop(self, slug: str) -> Desktop | None:
         return self.grouping.desktop(slug)
 
+    def launch_pending(self, slug: str) -> bool:
+        info = self.launched.get(slug)
+        return bool(info and time.monotonic() - info[1] < LAUNCH_GRACE_S)
+
     def state_of(self, d: Desktop) -> DState:
         op = self.runner.for_slug(d.slug)
+        if not op and d.server is None and self.launch_pending(d.slug):
+            return DState.LAUNCHING
         probe = self.probes.get(d.server.id) if d.server else None
         running_for = time.monotonic() - probe.running_since if probe and probe.running_since else None
         return derive_state(d, op.kind if op else None, probe.ok if probe else None, running_for, self.host,
@@ -463,7 +480,8 @@ class AppController:
             op = self.runner.for_slug(d.slug)
             srv = d.server
             view = DesktopView(slug=d.slug, name=d.name, state=state, state_label=label, color=color,
-                               spec=self._spec(d), error=self.errors.get(d.slug))
+                               spec=self._spec(d), error=self.errors.get(d.slug), key=self.key(d.slug),
+                               project=self.project.name)
             if srv:
                 view.ip = srv.ipv4
                 if self.static:
@@ -476,7 +494,10 @@ class AppController:
                 view.fixed_ip = d.fixed_ip.ip
             view.backup = self._backup_line(d, now)
             view.volumes = [f"{v.name} · {v.size} Go" + ("" if v.server_id else " (détaché)") for v in d.volumes]
-            view.note = self._note(d, state)
+            lic = self.eval_license(d)
+            if lic:
+                view.license = license.summary(lic, now.astimezone().date())
+            view.note = self._note(d, state) or (license.alert(lic, now.astimezone().date()) if lic else None)
             if op:
                 view.op_phase = op.phase
                 view.op_progress = op.progress / 100 if op.progress is not None else None
@@ -487,7 +508,11 @@ class AppController:
                 view.actions.remove(Act.CANCEL_OP)
             if not self._pw_known.get(d.slug) and Act.COPY_PASSWORD in view.actions:
                 view.actions.remove(Act.COPY_PASSWORD)
+            if not lic and Act.LICENSE in view.actions:
+                view.actions.remove(Act.LICENSE)
             view.primary = primary_action(state)
+            if state == DState.LAUNCHING:   # bouton « Lancer » grisé tant que le serveur démarre
+                view.primary, view.primary_disabled = Act.LAUNCH, True
             if srv and state in SERVER_STATES and view.primary != Act.SAVE_CLOSE:
                 view.secondary = Act.SAVE_CLOSE
             views.append(view)
@@ -524,6 +549,11 @@ class AppController:
         forced = " · arrêt forcé" if latest.forced else ""
         return (f"Dernière sauvegarde {fmt.ago(latest.created, now)} ({fmt.date_short(latest.created)}) · "
                 f"{fmt.gb(latest.image_size)}{extra}{forced}")
+
+    def eval_license(self, d: Desktop) -> license.EvalLicense | None:
+        """Licence d'évaluation suivie : celle du serveur en cours, sinon celle de la dernière sauvegarde."""
+        source = d.server if d.server else d.latest
+        return license.from_labels(source.labels) if source else None
 
     def _note(self, d: Desktop, state: DState) -> str | None:
         srv = d.server
@@ -584,7 +614,10 @@ class AppController:
             out.append(Banner("mode", "info", "Mode simulation : aucun appel à Hetzner, temps accéléré."))
         elif self.mode == "readonly":
             out.append(Banner("mode", "info", "Mode lecture seule : aucune modification ne sera envoyée à Hetzner."))
-        if self.refresh_error:
+        if self.token_invalid:
+            out.append(Banner("api", "error", "Clé API refusée par Hetzner (révoquée ou supprimée) : ce projet n'est "
+                              "plus interrogé.", [("Que faire ?", "token_invalid")]))
+        elif self.refresh_error:
             out.append(Banner("api", "error", f"Hetzner injoignable : {self.refresh_error}",
                               [("Réessayer", "refresh")]))
         if self.inventory is None:
@@ -623,6 +656,14 @@ class AppController:
             out.append(Banner("import", "info",
                               f"{n} snapshot{'s' if n > 1 else ''} existant{'s' if n > 1 else ''} à importer comme bureau.",
                               [("Importer…", "import")]))
+        today = date.today()
+        for d in g.desktops:
+            lic = self.eval_license(d)
+            if lic and license.needs_action(lic, today):
+                left = lic.days_left(today)
+                when = f"expirée depuis {-left} j" if left < 0 else f"expire dans {left} j"
+                out.append(Banner(f"eval:{d.slug}:{lic.expires:%Y%m%d}", "warning",
+                                  f"Licence d'évaluation de « {d.name} » : {when}.", [("Que faire ?", f"license:{d.slug}")]))
         dormant = sum(item.monthly for item in self.dormant_items() if item.kind in ("ip", "volume"))
         if dormant > 0:
             out.append(Banner("dormant", "info", f"Ressources dormantes : {fmt.eur_m(dormant)} facturés pour rien.",
@@ -671,6 +712,9 @@ class AppController:
         return d
 
     def launch(self, slug: str, name: str, params: LaunchParams) -> Operation:
+        d = self.desktop(slug)
+        if self.runner.for_slug(slug) or self.launch_pending(slug) or (d and d.server):
+            raise UserError(f"« {name} » est déjà lancé ou en cours de lancement")
         return self._submit(LaunchOp(self.ctx, slug, name, params))
 
     def save(self, slug: str, close: bool, quit_mode: bool = False) -> Operation:
@@ -791,6 +835,13 @@ class AppController:
     def cleanup(self, item: DormantItem) -> Operation:
         return self._submit(CleanupOp(self.ctx, item.kind, item.resource, item.title))
 
+    def mark_eval_auto(self, slug: str) -> Operation:
+        """La tâche de prolongation a été installée à la main dans la session en cours."""
+        d = self._require(slug)
+        if not d.server:
+            raise UserError("Lancez d'abord le bureau : la tâche s'installe dans Windows")
+        return self._submit(EvalAutoOp(self.ctx, slug, d.name, d.server.id))
+
     def set_credentials(self, slug: str, user: str, password: str | None, forget: bool = False) -> None:
         self.config.update_prefs(slug, rdp_user=user or "Administrator")
         if forget:
@@ -906,48 +957,19 @@ class AppController:
     def quit_discard(self, qs: QuitState, slug: str) -> None:
         qs.attempted[slug] = self.discard(slug)
 
-    # --- token Hetzner ------------------------------------------------------------------------------
-    def check_token(self, token: str) -> Future:
-        return self._bg.submit(self.backend.verify_token, token)
+    # --- projet ---------------------------------------------------------------------------------------
+    def key(self, slug: str) -> str:
+        """Identifiant d'un bureau dans l'interface, unique entre projets."""
+        return f"{self.project.id}/{slug}"
 
-    def apply_token(self, token: str, source: str, remember: bool) -> None:
-        """Bascule sur un token vérifié : l'état propre à l'ancien projet est oublié puis rechargé."""
-        self.backend.set_token(token)
-        if self._on_secret:
-            self._on_secret(token)
-        if remember:
-            try:
-                self.creds.set_token(token)
-                source = "keyring"
-            except Exception as exc:  # noqa: BLE001
-                self._log("warning", f"Token non mémorisé dans le Gestionnaire d'identifiants : {exc}")
-        first = self.locked
-        self.token_source = source
-        self._token_gen += 1
-        self.inventory = None
-        self.grouping = Grouping()
-        self.inventory_version += 1
-        self.refresh_error = None
-        self.last_refresh = None
-        self.probes.clear()
-        self.errors.clear()
-        self.failed_launch.clear()
-        self.reminder_at.clear()
-        self.pending_autoconnect.clear()
-        self.dismissed.clear()
-        self._creds_swept = False
-        self._next_refresh = 0.0
-        self.locked = False
-        self._log("info", "Token Hetzner chargé" if first else "Token Hetzner remplacé : rechargement du projet")
-        self.refresh_now()
+    def _token_rejected(self) -> None:
+        """Clé révoquée ou supprimée : on arrête d'interroger Hetzner et l'interface propose de l'oublier."""
+        if self.token_invalid:
+            return
+        self.token_invalid = True
+        self._log("error", f"Clé API du projet « {self.project.name} » refusée par Hetzner")
         if self.ui:
-            self.ui.on_model_changed()
-
-    def forget_token(self) -> None:
-        self.creds.delete_token()
-        if self.token_source == "keyring":
-            self.token_source = "session"
-        self._log("info", "Token retiré du Gestionnaire d'identifiants (gardé pour cette session)")
+            self.ui.on_token_invalid()
 
     def shutdown(self) -> None:
         self.hard_stop.set()

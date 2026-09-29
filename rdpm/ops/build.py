@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from .. import fmt
+from .. import fmt, license
 from ..build import catalog
 from ..build.reinstall_log import parse_reinstall_log, strip_ansi
 from ..build.scripts import (
@@ -23,7 +23,7 @@ from ..build.scripts import (
     render_postinstall_ps1, ubuntu_prepare,
 )
 from ..constants import (
-    BUILD_DIR, L_DESKTOP, L_FORCED, L_LOC, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_ROLE, L_SRC_SERVER, L_TYPE,
+    BUILD_DIR, EVAL_ALERT_DAYS, L_DESKTOP, L_FORCED, L_LOC, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_ROLE, L_SRC_SERVER, L_TYPE,
     OP_BUILDING, ROLE_TMP,
 )
 from ..hetzner.errors import OpCancelled, UserError, api_code
@@ -111,6 +111,14 @@ class BuildOp(Operation):
 
     def _labels(self) -> dict[str, str]:
         return {L_MANAGED: "1", L_ROLE: ROLE_TMP, L_DESKTOP: self.slug}
+
+    def _edition(self) -> catalog.Edition | None:
+        return catalog.EDITIONS.get(self.params.edition)
+
+    def _eval_rearm_days(self) -> int | None:
+        """Seuil de la prolongation automatique, uniquement pour une édition d'évaluation Microsoft."""
+        ed = self._edition()
+        return EVAL_ALERT_DAYS if ed and ed.eval_days else None
 
     # --- déroulement -------------------------------------------------------------------------
     def execute(self) -> None:
@@ -295,7 +303,7 @@ class BuildOp(Operation):
     def _customize_image(self) -> None:
         p = self.params
         self.set_phase("Personnalisation de l'image (clavier, fuseau, réglages)…", 95, cancellable=True)
-        script = alpine_hook(self.image_name, render_postinstall_ps1(p.timezone),
+        script = alpine_hook(self.image_name, render_postinstall_ps1(p.timezone, self._eval_rearm_days()),
                              render_locale_xml(p.keyboard, catalog.default_keyboard(p.language)))
         r = self._run(script, 300)
         if not r.ok or "RDPM_HOOKED" not in r.out:
@@ -345,6 +353,10 @@ class BuildOp(Operation):
         self.set_phase("Snapshot du Windows de référence…", 0)
         labels = desktop_labels(self.slug, **{L_SRC_SERVER: srv.id, L_TYPE: p.server_type, L_LOC: p.location,
                                               L_FORCED: int(forced)})
+        ed = self._edition()
+        if ed and ed.eval_days:   # licence d'évaluation activée pendant la construction
+            labels.update(license.to_labels(license.new_license(date.today(), ed.eval_rearms, auto=True,
+                                                                period_days=ed.eval_days)))
         image_id, action_id = backend.create_snapshot(srv.id, format_description(self.name, datetime.now(timezone.utc)),
                                                       labels)
         self.image_id = image_id

@@ -42,7 +42,7 @@ class WaitTimeout(Exception):
 
 _API_MESSAGES: dict[str, tuple[str, str | None, bool]] = {
     "unauthorized": ("Token API invalide ou révoqué",
-                     "Changez-le dans la barre « Token Hetzner » en haut de la fenêtre.", False),
+                     "Remplacez ou retirez la clé dans la barre des projets, en haut de la fenêtre.", False),
     "forbidden": ("Le token API est en lecture seule",
                   "Créez un token « Lecture & écriture » (console Hetzner → Sécurité → Tokens API).", False),
     "token_readonly": ("Le token API est en lecture seule",
