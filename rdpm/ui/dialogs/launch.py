@@ -21,6 +21,61 @@ CITY_FR = {"Nuremberg": "Nuremberg", "Falkenstein": "Falkenstein", "Helsinki": "
            "Ashburn, VA": "Ashburn (US)", "Hillsboro, OR": "Hillsboro (US)", "Singapore": "Singapour"}
 
 
+def city_label(static, loc: str) -> str:
+    city = static.city(loc)
+    return CITY_FR.get(city, city)
+
+
+def ordered_locations(static) -> list[str]:
+    return [loc for loc in LOCATION_ORDER if loc in static.locations] + \
+        [loc for loc in static.locations if loc not in LOCATION_ORDER]
+
+
+class OfferList(ctk.CTkScrollableFrame):
+    """Liste de types de serveur (radio + prix), partagée par « Lancer » et « Créer un Windows »."""
+
+    def __init__(self, master, type_var: tk.StringVar, on_select: Callable[[], None], height: int = 230) -> None:
+        super().__init__(master, height=height, fg_color=t.SURFACE, corner_radius=10, border_width=1,
+                         border_color=t.BORDER)
+        self.grid_columnconfigure(1, weight=1)
+        self.type_var, self.on_select = type_var, on_select
+
+    def render(self, offers: list[Offer], empty_text: str | None = None) -> None:
+        for child in self.winfo_children():
+            child.destroy()
+        if empty_text:
+            label(self, empty_text, 12, color=t.tone("warning")[0], wraplength=500).grid(
+                row=0, column=0, columnspan=4, padx=12, pady=12)
+        for row, offer in enumerate(offers, start=1):
+            self._row(row, offer)
+
+    def _row(self, row: int, offer: Offer) -> None:
+        st = offer.stype
+        state = "normal" if offer.available else "disabled"
+        color = t.TEXT if offer.available else t.FAINT
+        radio = ctk.CTkRadioButton(self, text="", variable=self.type_var, value=offer.name,
+                                   command=self.on_select, state=state, width=24, radiobutton_width=18,
+                                   radiobutton_height=18)
+        radio.grid(row=row, column=0, padx=(10, 2), pady=6, sticky="w")
+        name = ctk.CTkFrame(self, fg_color="transparent")
+        name.grid(row=row, column=1, sticky="w", pady=6)
+        label(name, st.name, 13, "bold", color=color).pack(side="left")
+        if offer.recommended:
+            ctk.CTkLabel(name, text="RECOMMANDÉ", font=t.font(9, "bold"), fg_color=t.tone("success")[1],
+                         text_color=t.tone("success")[0], corner_radius=6, height=18, padx=6).pack(side="left", padx=8)
+        if not offer.available:
+            ctk.CTkLabel(name, text="INDISPONIBLE", font=t.font(9, "bold"), fg_color=t.tone("muted")[1],
+                         text_color=t.tone("muted")[0], corner_radius=6, height=18, padx=6).pack(side="left", padx=8)
+        label(name, f"  {st.cores} vCPU {st.cpu_label} · {st.memory:g} Go · {st.disk} Go", 12,
+              color=t.MUTED).pack(side="left")
+        label(self, fmt.eur_h(offer.price_h), 12, "bold", color=color).grid(row=row, column=2, padx=8, sticky="e")
+        label(self, f"≈ {fmt.eur(offer.price_h * 30)} / 30 h", 11, color=t.MUTED).grid(
+            row=row, column=3, padx=(4, 12), sticky="e")
+        if offer.available:
+            for widget in (name, *name.winfo_children()):
+                widget.bind("<Button-1>", lambda _e, n=offer.name: (self.type_var.set(n), self.on_select()))
+
+
 class LaunchDialog(Modal):
     def __init__(self, app, desktop: Desktop, on_submit: Callable[[LaunchParams], None],
                  snapshot: SnapshotInfo | None = None, new_name: str | None = None,
@@ -35,8 +90,7 @@ class LaunchDialog(Modal):
         self.prefs = self.ctrl.config.prefs(desktop.slug)
         self.fixed = None if new_name else desktop.fixed_ip
         lock, self.lock_reasons = (None, []) if new_name else desktop.location_lock()
-        self.locations = [loc for loc in LOCATION_ORDER if loc in self.static.locations] + \
-            [loc for loc in self.static.locations if loc not in LOCATION_ORDER]
+        self.locations = ordered_locations(self.static)
         self.city_to_loc = {self._city(loc): loc for loc in self.locations}
         default_loc = lock or self.prefs.last_location or (self.snapshot.labels.get(L_LOC) if self.snapshot else None)
         self.loc_var = tk.StringVar(value=default_loc if default_loc in self.locations else self.locations[0])
@@ -87,8 +141,7 @@ class LaunchDialog(Modal):
 
     # --- sections ------------------------------------------------------------------------------
     def _city(self, loc: str) -> str:
-        city = self.static.city(loc)
-        return CITY_FR.get(city, city)
+        return city_label(self.static, loc)
 
     def _unavailable_notice(self, unavailable: tuple[str, str]) -> None:
         stype, loc = unavailable
@@ -155,10 +208,8 @@ class LaunchDialog(Modal):
         ctk.CTkCheckBox(head, text="Afficher les indisponibles", variable=self.show_unavailable,
                         command=self._refresh_offers, font=t.font(11), checkbox_width=16,
                         checkbox_height=16).pack(side="right")
-        self.offer_frame = ctk.CTkScrollableFrame(self.left, height=230, fg_color=t.SURFACE, corner_radius=10,
-                                                  border_width=1, border_color=t.BORDER)
+        self.offer_frame = OfferList(self.left, self.type_var, self._on_offer)
         self.offer_frame.pack(fill="x")
-        self.offer_frame.grid_columnconfigure(1, weight=1)
         self.disk_info = ctk.CTkFrame(self.left, fg_color="transparent", height=1)
         self.disk_info.pack(fill="x", pady=(6, 0))
 
@@ -218,25 +269,21 @@ class LaunchDialog(Modal):
 
     # --- offres --------------------------------------------------------------------------------
     def _refresh_offers(self) -> None:
-        for child in self.offer_frame.winfo_children():
-            child.destroy()
         for child in self.disk_info.winfo_children():
             child.destroy()
         if not self.snapshot:
+            self.offer_frame.render([])
             return
         loc = self.loc_var.get()
         self.offers = compatible_offers(self.static.server_types, loc, self.snapshot.disk_size,
                                         self.snapshot.architecture, self.show_unavailable.get())
         available = [o for o in self.offers if o.available]
-        if not available:
-            label(self.offer_frame, f"Aucun type compatible (disque ≥ {self.snapshot.disk_size} Go) disponible "
-                                    f"à {self._city(loc)} en ce moment. Essayez un autre emplacement.", 12,
-                  color=t.tone("warning")[0], wraplength=500).grid(row=0, column=0, columnspan=4, padx=12, pady=12)
+        empty = None if available else (f"Aucun type compatible (disque ≥ {self.snapshot.disk_size} Go) disponible "
+                                        f"à {self._city(loc)} en ce moment. Essayez un autre emplacement.")
         if self.type_var.get() not in {o.name for o in available}:
             rec = next((o for o in available if o.recommended), available[0] if available else None)
             self.type_var.set(rec.name if rec else "")
-        for row, offer in enumerate(self.offers):
-            self._offer_row(row, offer)
+        self.offer_frame.render(self.offers, empty)
         best = next((o for o in available if o.recommended), None)
         self.loc_hint.configure(text=f"Le moins cher ici : {best.name} à {fmt.eur_h(best.price_h)} · disque du "
                                      f"bureau : {self.snapshot.disk_size} Go" if best else "")
@@ -246,33 +293,6 @@ class LaunchDialog(Modal):
             if not ok:
                 self.volume_vars[vol.id].set(False)
         self._on_offer()
-
-    def _offer_row(self, row: int, offer: Offer) -> None:
-        st = offer.stype
-        state = "normal" if offer.available else "disabled"
-        color = t.TEXT if offer.available else t.FAINT
-        radio = ctk.CTkRadioButton(self.offer_frame, text="", variable=self.type_var, value=offer.name,
-                                   command=self._on_offer, state=state, width=24, radiobutton_width=18,
-                                   radiobutton_height=18)
-        radio.grid(row=row, column=0, padx=(10, 2), pady=6, sticky="w")
-        name = ctk.CTkFrame(self.offer_frame, fg_color="transparent")
-        name.grid(row=row, column=1, sticky="w", pady=6)
-        label(name, st.name, 13, "bold", color=color).pack(side="left")
-        if offer.recommended:
-            ctk.CTkLabel(name, text="RECOMMANDÉ", font=t.font(9, "bold"), fg_color=t.tone("success")[1],
-                         text_color=t.tone("success")[0], corner_radius=6, height=18, padx=6).pack(side="left", padx=8)
-        if not offer.available:
-            ctk.CTkLabel(name, text="INDISPONIBLE", font=t.font(9, "bold"), fg_color=t.tone("muted")[1],
-                         text_color=t.tone("muted")[0], corner_radius=6, height=18, padx=6).pack(side="left", padx=8)
-        label(name, f"  {st.cores} vCPU {st.cpu_label} · {st.memory:g} Go · {st.disk} Go", 12,
-              color=t.MUTED).pack(side="left")
-        label(self.offer_frame, fmt.eur_h(offer.price_h), 12, "bold", color=color).grid(
-            row=row, column=2, padx=8, sticky="e")
-        label(self.offer_frame, f"≈ {fmt.eur(offer.price_h * 30)} / 30 h", 11, color=t.MUTED).grid(
-            row=row, column=3, padx=(4, 12), sticky="e")
-        if offer.available:
-            for widget in (name, *name.winfo_children()):
-                widget.bind("<Button-1>", lambda _e, n=offer.name: (self.type_var.set(n), self._on_offer()))
 
     def selected_offer(self) -> Offer | None:
         return next((o for o in self.offers if o.name == self.type_var.get() and o.available), None)

@@ -83,13 +83,14 @@ def main() -> int:
     from rdpm import notify
     from rdpm.controller import AppController
     from rdpm.hetzner.service import HcloudTransport, HetznerService
+    from rdpm.remote import SshRemote
 
     if args.fake:
         from rdpm.hetzner.fake import FakeCloud
         rdp.SIMULATE = True
         fake = FakeCloud(speed=args.fake_speed, fail={f for f in args.fake_fail.split(",") if f},
                          seed=args.fake_seed)
-        backend = HetznerService(fake, probe_fn=fake.probe, public_ip_fn=fake.public_ip)
+        backend = HetznerService(fake, probe_fn=fake.probe, public_ip_fn=fake.public_ip, remote=fake.remote)
         creds: rdp.CredentialStore = rdp.MemoryCredentialStore()
         sim_dir = LOG_DIR.parent / "simulation"
         config = AppConfig.load(sim_dir / "config.json")
@@ -108,7 +109,8 @@ def main() -> int:
         if token:
             RedactFilter.secrets.append(token)
         # Sans token, la fenêtre s'ouvre verrouillée sur la barre de saisie du token.
-        backend = HetznerService(HcloudTransport(token) if token else None, readonly=args.readonly)
+        backend = HetznerService(HcloudTransport(token) if token else None, readonly=args.readonly,
+                                 remote=SshRemote())
         sessions = SessionLog(SESSIONS_PATH)
         mode = "readonly" if args.readonly else "live"
 

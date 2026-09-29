@@ -12,6 +12,7 @@ RDP_DIR = APP_DIR / "rdp"
 CONFIG_PATH = APP_DIR / "config.json"
 SESSIONS_PATH = APP_DIR / "sessions.jsonl"
 STATIC_CACHE_PATH = APP_DIR / "static_cache.json"
+BUILD_DIR = APP_DIR / "build"  # clés SSH éphémères des constructions en cours
 
 KEYRING_SERVICE = APP_NAME
 KEYRING_TOKEN_USER = "api-token"
@@ -41,6 +42,7 @@ OP_SAVING = "saving"
 OP_CHECKPOINT = "checkpoint"
 OP_DISCARDING = "discarding"
 OP_DUPLICATING = "duplicating"
+OP_BUILDING = "building"
 
 RDP_PORT = "3389"
 DEFAULT_RDP_USER = "Administrator"
@@ -57,6 +59,13 @@ DEFAULT_SETTINGS = {
     "confirm_save_close": True,
     "auto_connect": True,
     "appearance": "system",
+    # Construction d'un Windows de référence (secondes)
+    "build_ssh_timeout_s": 300,
+    "build_prepare_timeout_s": 900,
+    "build_installer_timeout_s": 2400,
+    "build_windows_timeout_s": 2700,
+    "build_settle_s": 120,
+    "build_shutdown_timeout_s": 600,
 }
 
 REFRESH_IDLE_S = 30

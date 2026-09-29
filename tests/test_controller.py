@@ -13,7 +13,7 @@ from rdpm.state import DState
 
 def make_controller(tmp_path, fail=()):
     fake = FakeCloud(speed=2000.0, fail=set(fail), seed="demo")
-    backend = HetznerService(fake, probe_fn=fake.probe, public_ip_fn=fake.public_ip)
+    backend = HetznerService(fake, probe_fn=fake.probe, public_ip_fn=fake.public_ip, remote=fake.remote)
     ctrl = AppController(backend, AppConfig(path=tmp_path / "c.json"), MemoryCredentialStore(),
                          SessionLog(tmp_path / "s.jsonl"), mode="fake")
     return fake, ctrl

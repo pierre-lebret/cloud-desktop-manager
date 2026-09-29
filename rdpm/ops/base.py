@@ -29,6 +29,7 @@ class OpContext:
     host: str
     hard_stop: threading.Event
     static: Callable[[], StaticData | None]
+    register_secret: Callable[[str], None] | None = None  # masque un secret dans app.log
 
 
 class Operation:
@@ -67,14 +68,18 @@ class Operation:
             self.outcome = "ok"
         except OpCancelled as exc:
             self.outcome = "cancelled"
-            self.log(str(exc) or "Opération annulée", "warning")
-            self._safe_cleanup()
+            try:
+                self.log(str(exc) or "Opération annulée", "warning")
+            finally:
+                self._safe_cleanup()   # même si la journalisation elle-même échoue
         except Exception as exc:  # noqa: BLE001 - toute erreur doit remonter proprement à l'UI
             self.outcome = "failed"
             self.error = to_user_error(exc)
-            log.exception("Échec de %s (%s)", self.title, self.slug)
-            self.log(f"Échec : {self.error}", "error")
-            self._safe_cleanup()
+            try:
+                log.exception("Échec de %s (%s)", self.title, self.slug)
+                self.log(f"Échec : {self.error}", "error")
+            finally:
+                self._safe_cleanup()
 
     def _safe_cleanup(self) -> None:
         try:

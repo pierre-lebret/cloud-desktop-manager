@@ -20,6 +20,7 @@ from ..state import Act
 from . import theme as t
 from .desktop_card import DesktopCard
 from .dialogs.base import confirm, confirm_typed, ask_text, top_window
+from .dialogs.build import BuildDialog, BuildDoneDialog
 from .dialogs.launch import LaunchDialog
 from .dialogs.manage import (
     AddVolumeDialog, ConflictDialog, CredentialsDialog, DeleteDesktopDialog, DuplicateDialog, FirewallDialog,
@@ -147,6 +148,8 @@ class MainWindow(ctk.CTk):
         self.empty_sub.pack()
         self.empty_bar = ctk.CTkProgressBar(self.empty, mode="indeterminate", width=260, progress_color=t.ACCENT)
         self.empty_btn = primary_button(self.empty, "Importer un snapshot", lambda: ImportChooser(self), width=200)
+        self.empty_build_btn = primary_button(self.empty, "Créer un Windows de référence…", lambda: BuildDialog(self),
+                                              width=260)
         self.import_frame = ctk.CTkFrame(self.scroll, fg_color="transparent", height=1)
         self.import_frame.grid(row=3, column=0, sticky="ew", pady=(18, 10))
         self.scroll.bind("<Configure>", lambda _e: self._relayout())
@@ -178,7 +181,7 @@ class MainWindow(ctk.CTk):
     def set_locked(self, locked: bool) -> None:
         """Sans token validé, tout ce qui parle à Hetzner reste désactivé."""
         state = "disabled" if locked else "normal"
-        for btn in (*self.header_buttons, self.empty_btn):
+        for btn in (*self.header_buttons, self.empty_btn, self.empty_build_btn):
             btn.configure(state=state)
         self._render()
 
@@ -333,6 +336,7 @@ class MainWindow(ctk.CTk):
             return
         self.empty.grid(row=2, column=0, sticky="ew")
         self.empty_btn.pack_forget()
+        self.empty_build_btn.pack_forget()
         if ctrl.locked:
             self.empty_bar.stop()
             self.empty_bar.pack_forget()
@@ -356,11 +360,14 @@ class MainWindow(ctk.CTk):
         self.empty_title.configure(text="Aucun bureau géré")
         if ctrl.grouping.unmanaged_snapshots:
             self.empty_sub.configure(text="Tes snapshots Windows existants peuvent devenir des bureaux : "
-                                          "l'application les lancera à la demande et les sauvegardera à la fermeture.")
+                                          "l'application les lancera à la demande et les sauvegardera à la fermeture. "
+                                          "Tu peux aussi installer un Windows neuf (+ Nouveau bureau).")
             self.empty_btn.pack(pady=16)
         else:
-            self.empty_sub.configure(text="Aucun snapshot Windows trouvé dans ce projet. Installe Windows sur un "
-                                          "serveur Hetzner, crée un snapshot, puis importe-le ici.")
+            self.empty_sub.configure(text="Aucun snapshot Windows dans ce projet. L'application peut installer "
+                                          "Windows toute seule sur un serveur temporaire (≈ 30–40 min) et en faire "
+                                          "ton premier bureau.")
+            self.empty_build_btn.pack(pady=16)
 
     def _render_imports(self) -> None:
         g = self.controller.grouping
@@ -446,6 +453,8 @@ class MainWindow(ctk.CTk):
             volume_help(self)
         elif op.followup == "resize_help":
             resize_help(self)
+        elif op.followup == "build_done":
+            BuildDoneDialog(self, op)
 
     # --- actions ------------------------------------------------------------------------------------
     def _safe(self, fn, *args, **kwargs):

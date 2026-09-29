@@ -5,21 +5,19 @@ Règle d'or : le serveur n'est supprimé qu'après confirmation que le snapshot 
 
 from __future__ import annotations
 
-import time
 from datetime import datetime, timezone
 
-from .. import fmt
 from ..constants import (
     L_FORCED, L_LOC, L_OP_IMAGE, L_SRC_SERVER, L_TYPE, OP_CHECKPOINT, OP_DISCARDING, OP_SAVING,
 )
-from ..hetzner.errors import ActionFailed, OpCancelled, UserError, WaitTimeout
-from ..hetzner.waiting import wait_actions, wait_server_status
+from ..hetzner.errors import UserError
+from ..hetzner.waiting import wait_actions
 from ..labels import desktop_labels, format_description
 from ..models import ServerInfo
 from .base import OpContext, Operation
 from .common import (
     apply_retention, cleanup_after_delete, clear_op, delete_server_with_retry, mark_op, record_session,
-    session_summary, wait_snapshot_ready,
+    session_summary, stop_windows, wait_snapshot_ready,
 )
 
 
@@ -59,47 +57,7 @@ class SaveOp(Operation):
 
     # --- étapes ----------------------------------------------------------------------------
     def stop_windows(self, srv: ServerInfo) -> bool:
-        """Arrêt propre (ACPI), puis décision de l'utilisateur si Windows traîne. Vrai si forcé."""
-        backend = self.ctx.backend
-        if srv.status == "off":
-            return False
-        self.set_phase("Arrêt de Windows…", cancellable=True)
-        if srv.status != "stopping":
-            try:
-                wait_actions(backend, [backend.server_action(srv.id, "shutdown")], self, timeout_s=120)
-            except ActionFailed as exc:
-                self.log(f"Signal d'arrêt refusé ({exc}), attente de l'arrêt quand même", "warning")
-        start = time.monotonic()
-        timeout = float(self.ctx.config.get("shutdown_timeout_s"))
-        while True:
-            try:
-                wait_server_status(
-                    backend, srv.id, {"off"}, self, timeout_s=timeout, interval=5,
-                    on_tick=lambda _e: self.set_phase(
-                        f"Arrêt de Windows… {fmt.clock(time.monotonic() - start)}", cancellable=True))
-                self.log("Windows est arrêté")
-                return False
-            except WaitTimeout:
-                pass
-            choice = self.ask(
-                "Windows ne s'arrête pas",
-                f"« {self.name} » n'a pas fini de s'arrêter après {fmt.duration(time.monotonic() - start)} "
-                "(mises à jour Windows en cours ?).\n\nForcer l'arrêt revient à débrancher la prise : "
-                "les fichiers non enregistrés peuvent être perdus.",
-                [("wait", "Attendre 5 min de plus", "default"), ("force", "Forcer l'arrêt", "danger"),
-                 ("cancel", "Annuler (laisser allumé)", "default")],
-                default="force" if self.quit_mode else "wait",
-                countdown_s=int(self.ctx.config.get("quit_force_countdown_s")) if self.quit_mode else None)
-            if choice == "cancel":
-                raise OpCancelled("Sauvegarde annulée : le serveur reste allumé")
-            if choice == "force":
-                self.set_phase("Arrêt forcé…")
-                wait_actions(backend, [backend.server_action(srv.id, "poweroff")], self, timeout_s=120)
-                wait_server_status(backend, srv.id, {"off"}, self, timeout_s=180, interval=3)
-                self.log("Arrêt forcé effectué", "warning")
-                return True
-            timeout = 300.0
-            self.set_phase("Arrêt de Windows…", cancellable=True)
+        return stop_windows(self, srv, quit_mode=self.quit_mode)
 
     def snapshot(self, srv: ServerInfo) -> int:
         backend = self.ctx.backend

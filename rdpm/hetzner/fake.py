@@ -2,7 +2,10 @@
 
 Sert au mode --fake (UI sans frais, temps accéléré) et aux tests. Les pannes injectables
 (`fail`) permettent d'exercer tous les chemins d'erreur :
-  snapshot, shutdown_timeout, resource_unavailable, delete, probe, change_type.
+  snapshot, shutdown_timeout, resource_unavailable, delete, probe, change_type,
+  build_ssh_timeout, build_prepare, build_image_name, build_install_error, build_rdp_never.
+
+`FakeRemote` simule le SSH du serveur de construction (Ubuntu → Alpine → Windows) pour BuildOp.
 """
 
 from __future__ import annotations
@@ -10,6 +13,7 @@ from __future__ import annotations
 import copy
 import itertools
 import json
+import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -17,7 +21,19 @@ from pathlib import Path
 
 from hcloud import APIException
 
+from ..build.scripts import tag_of
+from ..remote import RemoteResult
+
 SEED_PATH = Path(__file__).with_name("static_seed.json")
+SYSTEM_IMAGES = {
+    "ubuntu-24.04": {"id": 161547269, "name": "ubuntu-24.04", "os_flavor": "ubuntu"},
+    "ubuntu-22.04": {"id": 67794396, "name": "ubuntu-22.04", "os_flavor": "ubuntu"},
+    "debian-12": {"id": 114690387, "name": "debian-12", "os_flavor": "debian"},
+}
+BUILD_BOOT_S = 20          # secondes simulées avant que SSH réponde après un (re)démarrage
+BUILD_WINDOWS_S = 300      # durée simulée de l'installation Windows avant que RDP réponde
+IMAGE_NAMES = ["Windows Server 2025 SERVERSTANDARDCORE", "Windows Server 2025 SERVERSTANDARD",
+               "Windows Server 2025 SERVERDATACENTERCORE", "Windows Server 2025 SERVERDATACENTER"]
 
 DURATIONS = {  # secondes simulées
     "create_server": 40, "start_server": 15, "shutdown_server": 2, "os_shutdown": 30,
@@ -78,11 +94,14 @@ class FakeCloud:
         self.volumes: dict[int, dict] = {}
         self.primary_ips: dict[int, dict] = {}
         self.firewalls: dict[int, dict] = {}
+        self.ssh_keys: dict[int, dict] = {}
         self.actions: dict[int, dict] = {}
         self.boot_at: dict[int, float] = {}
         self.os_shutdown_pending: set[int] = set()
         self.public_ip_value = "198.51.100.23"
         self.requests: list[tuple[str, str, dict | None]] = []
+        self.builds: dict[int, dict] = {}   # serveur de construction → état simulé (voir FakeRemote)
+        self.remote = FakeRemote(self)
         self._seed_account()
         if seed == "demo":
             self._seed_demo()
@@ -162,9 +181,10 @@ class FakeCloud:
         if root == "actions" and len(parts) == 2:
             return {"action": self._public(self._find(self.actions, parts[1], "action"))}
         store = {"servers": self.servers, "images": self.images, "volumes": self.volumes,
-                 "primary_ips": self.primary_ips, "firewalls": self.firewalls}.get(root)
+                 "primary_ips": self.primary_ips, "firewalls": self.firewalls,
+                 "ssh_keys": self.ssh_keys}.get(root)
         key = {"servers": "server", "images": "image", "volumes": "volume",
-               "primary_ips": "primary_ip", "firewalls": "firewall"}.get(root)
+               "primary_ips": "primary_ip", "firewalls": "firewall", "ssh_keys": "ssh_key"}.get(root)
         if method == "POST" and len(parts) == 1:
             return getattr(self, f"_create_{key}")(body)
         obj = self._find(store, parts[1], key)
@@ -201,7 +221,8 @@ class FakeCloud:
             ids = ids if isinstance(ids, list) else [ids]
             return {"actions": [self._public(self.actions[int(i)]) for i in ids if int(i) in self.actions]}
         store = {"servers": self.servers, "images": self.images, "volumes": self.volumes,
-                 "primary_ips": self.primary_ips, "firewalls": self.firewalls}[root]
+                 "primary_ips": self.primary_ips, "firewalls": self.firewalls,
+                 "ssh_keys": self.ssh_keys}[root]
         items = [o for o in store.values() if _match(o.get("labels") or {}, params.get("label_selector"))]
         if root == "images" and params.get("type"):
             items = [o for o in items if o["type"] == params["type"]]
@@ -244,11 +265,21 @@ class FakeCloud:
         avail = next((l for l in stype.get("locations", []) if l["name"] == location), None)
         if not avail or not avail.get("available", True):
             raise _err("resource_unavailable", f"{stype['name']} unavailable in {location}")
-        image = self.images.get(int(body["image"]))
-        if image is None:
-            raise _err("invalid_input", "image not found")
-        if image["disk_size"] > stype["disk"]:
-            raise _err("invalid_input", "image disk is bigger than server type disk")
+        system = None
+        raw_image = body["image"]
+        if isinstance(raw_image, str) and not raw_image.isdigit():
+            system = SYSTEM_IMAGES.get(raw_image)
+            if system is None:
+                raise _err("invalid_input", f"image {raw_image!r} not found")
+            image = None
+        else:
+            image = self.images.get(int(raw_image))
+            if image is None:
+                raise _err("invalid_input", "image not found")
+            if image["disk_size"] > stype["disk"]:
+                raise _err("invalid_input", "image disk is bigger than server type disk")
+        for kid in body.get("ssh_keys") or []:
+            self._find(self.ssh_keys, kid, "ssh_key")
         net = body.get("public_net") or {}
         ipv4 = None
         if net.get("enable_ipv4", True):
@@ -270,17 +301,25 @@ class FakeCloud:
             if vol["location"]["name"] != location:
                 raise _err("invalid_input", "volume is in another location")
             vol["server"] = sid
-        srv = self._server_json(sid, name, stype, location, body.get("labels") or {}, image["id"],
-                                "initializing", _now(), stype["disk"], ipv4, fw_ids, vol_ids)
+        srv = self._server_json(sid, name, stype, location, body.get("labels") or {},
+                                image["id"] if image else None, "initializing", _now(), stype["disk"], ipv4,
+                                fw_ids, vol_ids)
         self.servers[sid] = srv
         for fid in fw_ids:
             self.firewalls[fid]["applied_to"].append({"type": "server", "server": {"id": sid}})
         start = body.get("start_after_create", True)
+        if system:
+            # Serveur Linux : SSH répond (clé enregistrée) mais RDP jamais tant que Windows n'est pas installé.
+            self.builds[sid] = {"stage": "ubuntu" if body.get("ssh_keys") else "nokey", "log": "",
+                                "boot": None, "idle": False, "next": 0, "prompt": None,
+                                "image_name": None, "password": None, "hooked": None}
 
         def created() -> None:
             srv["status"] = "running" if start else "off"
             if start:
-                self.boot_at[sid] = self.sim()
+                self.boot_at[sid] = float("inf") if system else self.sim()
+                if system:
+                    self.builds[sid]["boot"] = self.sim()
         action = self._action("create_server", [(sid, "server")], on_done=created)
         return {"server": copy.deepcopy(srv), "action": self._public(action), "next_actions": [],
                 "root_password": None}
@@ -293,6 +332,7 @@ class FakeCloud:
 
         def gone() -> None:
             self.servers.pop(sid, None)
+            self.builds.pop(sid, None)
             for vol in self.volumes.values():
                 if vol["server"] == sid:
                     vol["server"] = None
@@ -445,6 +485,26 @@ class FakeCloud:
         fw["rules"] = [{**r, "destination_ips": r.get("destination_ips", [])} for r in body["rules"]]
         return {"actions": [self._public(self._action("set_firewall_rules", [(fw["id"], "firewall")]))]}
 
+    def _delete_firewall(self, fw: dict) -> dict:
+        if fw["applied_to"]:
+            raise _err("resource_in_use", "firewall is still applied to resources")
+        self.firewalls.pop(fw["id"], None)
+        return {}
+
+    # --- clés SSH --------------------------------------------------------------------------
+    def _create_ssh_key(self, body: dict) -> dict:
+        if any(k["name"] == body["name"] or k["public_key"] == body["public_key"] for k in self.ssh_keys.values()):
+            raise _err("uniqueness_error", "ssh key name or public key is already used")
+        kid = next(self._ids)
+        key = {"id": kid, "name": body["name"], "public_key": body["public_key"], "fingerprint": f"fp:{kid}",
+               "labels": body.get("labels") or {}, "created": _iso(_now())}
+        self.ssh_keys[kid] = key
+        return {"ssh_key": copy.deepcopy(key)}
+
+    def _delete_ssh_key(self, key: dict) -> dict:
+        self.ssh_keys.pop(key["id"], None)
+        return {}
+
     def _firewall_apply_to_resources(self, fw: dict, body: dict) -> dict:
         actions = []
         for target in body.get("apply_to") or []:
@@ -526,3 +586,151 @@ class FakeCloud:
             now - timedelta(hours=1, minutes=40), 160, ipv4, [11664160], [])
         self.firewalls[11664160]["applied_to"].append({"type": "server", "server": {"id": sid}})
         self.boot_at[sid] = -10_000
+
+
+# --- SSH simulé du serveur de construction ------------------------------------------------------
+_G, _R, _P = "\x1b[32m", "\x1b[31m", "\x1b[0m"
+# (secondes simulées après le démarrage d'Alpine, lignes ajoutées à /reinstall.log)
+BUILD_TIMELINE: list[tuple[int, list[str]]] = [
+    (5, [f"{_G}***** PROCESS WINDOWS ISO *****{_P}"]),
+    (10, ["[#a1b2c3 0.9GiB/5.6GiB(16%) CN:16 DL:60MiB ETA:1m20s]"]),
+    (25, ["[#a1b2c3 2.5GiB/5.6GiB(45%) CN:16 DL:62MiB ETA:50s]"]),
+    (40, ["[#a1b2c3 4.5GiB/5.6GiB(80%) CN:16 DL:61MiB ETA:18s]"]),
+    (60, [f"{_G}***** IMAGES COUNT: 4 *****{_P}", *IMAGE_NAMES, ""]),
+    (70, [f"{_G}***** SELECTED IMAGE INFO *****{_P}"]),
+    (75, [f"{_G}***** ADD DRIVERS *****{_P}", f"{_G}***** ADD DRIVERS: GENERIC VIRTIO *****{_P}"]),
+    (85, [f"{_G}***** MOUNT BOOT.WIM *****{_P}"]),
+    (88, [f"{_G}***** AUTOUNATTEND.XML *****{_P}"]),
+    (95, [f"{_G}***** UNMOUNT BOOT.WIM *****{_P}", f"{_G}***** BOOT.WIM SIZE *****{_P}"]),
+    (100, [f"{_G}***** MOUNT INSTALL.WIM *****{_P}"]),
+    (110, [f"{_G}***** UNMOUNT INSTALL.WIM *****{_P}"]),
+    (120, [f"{_G}***** HOLD 2 *****{_P}"]),
+]
+_STEP_IMAGES, _STEP_INSTALL_WIM = 4, 10
+
+
+class FakeRemote:
+    """Machine à états d'un serveur de construction : ubuntu → prepared → rebooting → alpine → hold →
+    hooked → windows. Reconnaît les scripts à leur étiquette `# rdpm:<tag>`."""
+
+    def __init__(self, cloud: FakeCloud) -> None:
+        self.cloud = cloud
+        self.calls: list[tuple[str, int]] = []
+        self.public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE rdpm-build"
+
+    # --- clés et réseau (rien n'est écrit sur le disque) ------------------------------------
+    def available(self) -> bool:
+        return True
+
+    def keypair(self, path: Path) -> str:
+        return self.public_key
+
+    def forget_keypair(self, path: Path) -> None:
+        pass
+
+    def url_size(self, url: str) -> int | None:
+        if "build_iso_missing" in self.cloud.fail:
+            return None
+        return 6_014_152_704
+
+    # --- exécution -------------------------------------------------------------------------
+    def run(self, host: str, script: str, *, key=None, known_hosts=None, timeout: float = 60.0,
+            shell: str = "sh", user: str = "root") -> RemoteResult:
+        tag = tag_of(script)
+        with self.cloud._lock:
+            self.cloud._tick()
+            srv = next((s for s in self.cloud.servers.values()
+                        if (s["public_net"]["ipv4"] or {}).get("ip") == host), None)
+            if srv is None or srv["status"] != "running":
+                return RemoteResult(255, "", f"ssh: connect to host {host}: No route to host")
+            b = self.cloud.builds.get(srv["id"])
+            if (b is None or b["stage"] in ("nokey", "rebooting", "windows") or b["boot"] is None
+                    or "build_ssh_timeout" in self.cloud.fail
+                    or self.cloud.sim() - b["boot"] < BUILD_BOOT_S):
+                return RemoteResult(255, "", f"ssh: connect to host {host}: Connection refused")
+            # Ubuntu : root ; Alpine (reinstall.sh) : la clé est posée sur l'utilisateur « administrator ».
+            expected = "root" if b["stage"] in ("ubuntu", "prepared") else "administrator"
+            if user != expected:
+                return RemoteResult(255, "", f"{user}@{host}: Permission denied (publickey).")
+            self.calls.append((tag, srv["id"]))
+            handler = getattr(self, f"_do_{tag.replace('-', '_')}", None)
+            if handler is None:
+                return RemoteResult(127, "", f"script inconnu : {tag}")
+            return handler(srv, b, script)
+
+    def _do_ping(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        return RemoteResult(0, "RDPM_PONG\n", "")
+
+    def _do_ubuntu_prepare(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        if b["stage"] != "ubuntu":
+            return RemoteResult(1, "", "reinstall.sh: already prepared")
+        if "build_prepare" in self.cloud.fail:
+            return RemoteResult(1, "", "sha256sum: WARNING: 1 computed checksum did NOT match")
+        for key, pattern in (("image_name", r"--image-name '([^']*)'"), ("password", r"--password '([^']*)'"),
+                             ("iso", r"--iso '([^']*)'"), ("pubkey", r"printf '%s\\n' '([^']*)' > configs/ssh_keys")):
+            m = re.search(pattern, script)
+            b[key] = m.group(1) if m else None
+        b["stage"] = "prepared"
+        return RemoteResult(0, "Warning: Windows install prepared (simulé)\nRDPM_PREPARED\n", "")
+
+    def _do_reboot(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        sid = srv["id"]
+        if b["stage"] == "prepared":
+            b["stage"], b["boot"] = "rebooting", self.cloud.sim()
+
+            def alpine() -> None:
+                if self.cloud.builds.get(sid) is b:
+                    b["stage"], b["log"], b["next"] = "alpine", f"{_G}***** RDPM ALPINE *****{_P}\n", 0
+                    self.cloud._at(BUILD_TIMELINE[0][0], lambda: self._step(sid, 0))
+            self.cloud._at(BUILD_BOOT_S, alpine)
+        elif b["stage"] == "hooked":
+            b["stage"] = "windows"
+            self.cloud.boot_at[sid] = float("inf") if "build_rdp_never" in self.cloud.fail \
+                else self.cloud.sim() + BUILD_WINDOWS_S
+        else:
+            return RemoteResult(1, "", "rien à redémarrer dans cet état")
+        return RemoteResult(0, "RDPM_REBOOTING\n", "")
+
+    def _step(self, sid: int, idx: int) -> None:
+        b = self.cloud.builds.get(sid)
+        if b is None or b["stage"] != "alpine" or b["next"] != idx:
+            return
+        delay, lines = BUILD_TIMELINE[idx]
+        b["log"] += "\n".join(lines) + "\n"
+        b["next"] = idx + 1
+        if idx == _STEP_IMAGES and "build_image_name" in self.cloud.fail and not b.get("prompt_done"):
+            requested = b.get("image_name") or "?"
+            b["log"] += (f"{_R}***** ERROR *****{_P}\n{_R}Invalid image name: {requested}{_P}\n"
+                         "Choose a correct image name by one of follow command in ssh to continue:\n"
+                         + "".join(f"  echo '{n}' >/image-name\n" for n in IMAGE_NAMES))
+            b["prompt"] = list(IMAGE_NAMES)
+            return
+        if idx == _STEP_INSTALL_WIM and "build_install_error" in self.cloud.fail:
+            b["log"] += f"{_R}***** ERROR *****{_P}\n{_R}can't find install.wim{_P}\n"
+            b["idle"] = True
+            return
+        if idx + 1 < len(BUILD_TIMELINE):
+            self.cloud._at(BUILD_TIMELINE[idx + 1][0] - delay, lambda: self._step(sid, idx + 1))
+        else:
+            b["stage"], b["idle"] = "hold", True
+
+    def _do_alpine_status(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        if b["stage"] not in ("alpine", "hold"):
+            return RemoteResult(3, "", "")
+        state = "RDPM_IDLE" if b["idle"] else "RDPM_RUNNING"
+        return RemoteResult(0, f"{state}\nRDPM_LOG_BEGIN\n{b['log']}", "")
+
+    def _do_alpine_set_image_name(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        m = re.search(r"printf '%s\\n' '([^']*)' > /image-name", script)
+        name = m.group(1) if m else ""
+        if b.get("prompt") and name in b["prompt"]:
+            b["image_name"], b["prompt"], b["prompt_done"] = name, None, True
+            sid, nxt = srv["id"], b["next"]
+            self.cloud._at(2, lambda: self._step(sid, nxt))
+        return RemoteResult(0, "RDPM_IMAGE_SET\n", "")
+
+    def _do_alpine_hook(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        if b["stage"] != "hold":
+            return RemoteResult(1, "", "RDPM_ERR l'installeur n'est pas en attente")
+        b["stage"], b["hooked"] = "hooked", script
+        return RemoteResult(0, "RDPM_HOOKED\n", "")

@@ -25,6 +25,7 @@ class DState(str, Enum):
     CHECKPOINTING = "checkpointing"
     DISCARDING = "discarding"
     DUPLICATING = "duplicating"
+    BUILDING = "building"
     BUSY = "busy"
     INTERRUPTED = "interrupted"
     REMOTE_OP = "remote_op"
@@ -47,6 +48,7 @@ STATE_STYLE: dict[DState, tuple[str, str]] = {
     DState.CHECKPOINTING: ("Sauvegarde (reste allumé)", "accent"),
     DState.DISCARDING: ("Suppression…", "danger"),
     DState.DUPLICATING: ("Duplication…", "accent"),
+    DState.BUILDING: ("Installation de Windows…", "accent"),
     DState.BUSY: ("Opération en cours…", "info"),
     DState.INTERRUPTED: ("Opération interrompue", "warning"),
     DState.REMOTE_OP: ("Opération sur un autre poste", "warning"),
@@ -128,6 +130,7 @@ _ALLOWED: dict[DState, list[Act]] = {
     DState.CHECKPOINTING: [Act.CANCEL_OP],
     DState.DISCARDING: [],
     DState.DUPLICATING: [],
+    DState.BUILDING: [Act.CANCEL_OP],
     DState.BUSY: [],
     DState.INTERRUPTED: [Act.RESUME, Act.IGNORE_OP, Act.DISCARD],
     DState.REMOTE_OP: [Act.RESUME, Act.IGNORE_OP, Act.DISCARD],
@@ -152,6 +155,7 @@ OP_STATES = {
     "checkpoint": DState.CHECKPOINTING,
     "discard": DState.DISCARDING,
     "duplicate": DState.DUPLICATING,
+    "build": DState.BUILDING,
 }
 
 

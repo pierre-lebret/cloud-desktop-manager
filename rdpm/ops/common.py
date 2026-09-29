@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from .. import fmt, rdp
 from ..constants import L_OP, L_OP_HOST, L_OP_TS, OP_LABELS
-from ..hetzner.errors import ActionFailed, UserError, WaitTimeout, api_code
+from ..hetzner.errors import ActionFailed, OpCancelled, UserError, WaitTimeout, api_code
 from ..hetzner.waiting import wait_actions, wait_server_status
 from ..models import ServerInfo
 from ..pricing import billed_hours, session_cost
@@ -46,6 +46,57 @@ def delete_server_with_retry(op: Operation, server_id: int, attempts: int = 3) -
         return
     raise UserError("Serveur NON supprimé — il est toujours facturé",
                     f"Réessayez la suppression. Détail : {last}", code="delete_failed", retryable=True)
+
+
+def stop_windows(op: Operation, srv: ServerInfo, *, quit_mode: bool = False,
+                 force_on_timeout: bool = False, timeout_s: float | None = None) -> bool:
+    """Arrêt propre (ACPI), puis décision de l'utilisateur si Windows traîne (ou arrêt forcé d'office
+    avec `force_on_timeout`, pour un Windows neuf qui n'a rien à perdre). Vrai si forcé."""
+    backend = op.ctx.backend
+    if srv.status == "off":
+        return False
+    op.set_phase("Arrêt de Windows…", cancellable=True)
+    if srv.status != "stopping":
+        try:
+            wait_actions(backend, [backend.server_action(srv.id, "shutdown")], op, timeout_s=120)
+        except ActionFailed as exc:
+            op.log(f"Signal d'arrêt refusé ({exc}), attente de l'arrêt quand même", "warning")
+    start = time.monotonic()
+    timeout = float(timeout_s if timeout_s is not None else op.ctx.config.get("shutdown_timeout_s"))
+    while True:
+        try:
+            wait_server_status(
+                backend, srv.id, {"off"}, op, timeout_s=timeout, interval=5,
+                on_tick=lambda _e: op.set_phase(
+                    f"Arrêt de Windows… {fmt.clock(time.monotonic() - start)}", cancellable=True))
+            op.log("Windows est arrêté")
+            return False
+        except WaitTimeout:
+            pass
+        if force_on_timeout:
+            op.log("Windows ne répond pas au signal d'arrêt : arrêt forcé (installation neuve, rien à perdre)",
+                   "warning")
+            choice = "force"
+        else:
+            choice = op.ask(
+                "Windows ne s'arrête pas",
+                f"« {op.name} » n'a pas fini de s'arrêter après {fmt.duration(time.monotonic() - start)} "
+                "(mises à jour Windows en cours ?).\n\nForcer l'arrêt revient à débrancher la prise : "
+                "les fichiers non enregistrés peuvent être perdus.",
+                [("wait", "Attendre 5 min de plus", "default"), ("force", "Forcer l'arrêt", "danger"),
+                 ("cancel", "Annuler (laisser allumé)", "default")],
+                default="force" if quit_mode else "wait",
+                countdown_s=int(op.ctx.config.get("quit_force_countdown_s")) if quit_mode else None)
+        if choice == "cancel":
+            raise OpCancelled("Sauvegarde annulée : le serveur reste allumé")
+        if choice == "force":
+            op.set_phase("Arrêt forcé…")
+            wait_actions(backend, [backend.server_action(srv.id, "poweroff")], op, timeout_s=120)
+            wait_server_status(backend, srv.id, {"off"}, op, timeout_s=180, interval=3)
+            op.log("Arrêt forcé effectué", "warning")
+            return True
+        timeout = 300.0
+        op.set_phase("Arrêt de Windows…", cancellable=True)
 
 
 def cleanup_after_delete(op: Operation, server: ServerInfo, fixed_ip_id: int | None) -> None:

@@ -54,11 +54,13 @@ class HetznerService:
 
     def __init__(self, transport, *, readonly: bool = False,
                  probe_fn: Callable[[str], bool] = netutil.rdp_probe,
-                 public_ip_fn: Callable[[], str | None] = netutil.detect_public_ip) -> None:
+                 public_ip_fn: Callable[[], str | None] = netutil.detect_public_ip,
+                 remote=None) -> None:
         self.transport = transport
         self.readonly = readonly
         self._probe = probe_fn
         self._public_ip = public_ip_fn
+        self.remote = remote  # exécution de scripts SSH (construction d'un Windows de référence)
 
     # --- token -----------------------------------------------------------------------------
     def set_token(self, token: str) -> None:
@@ -161,11 +163,12 @@ class HetznerService:
         return self._public_ip()
 
     # --- serveurs --------------------------------------------------------------------------
-    def create_server(self, *, name: str, server_type: str, image_id: int, location: str,
+    def create_server(self, *, name: str, server_type: str, image_id: int | str, location: str,
                       labels: dict[str, str], firewall_ids: Iterable[int] = (),
                       volume_ids: Iterable[int] = (), primary_ip_id: int | None = None,
                       start: bool = True, enable_ipv4: bool = True,
-                      enable_ipv6: bool = False) -> tuple[ServerInfo, list[int]]:
+                      enable_ipv6: bool = False, ssh_key_ids: Iterable[int] = ()) -> tuple[ServerInfo, list[int]]:
+        """`image_id` accepte aussi le nom d'une image système Hetzner (ex. « ubuntu-24.04 »)."""
         public_net: dict = {"enable_ipv4": enable_ipv4, "enable_ipv6": enable_ipv6}
         if primary_ip_id:
             public_net["ipv4"] = primary_ip_id
@@ -176,6 +179,9 @@ class HetznerService:
         if volume_ids:
             body["volumes"] = volume_ids
             body["automount"] = False
+        ssh_key_ids = list(ssh_key_ids)
+        if ssh_key_ids:
+            body["ssh_keys"] = ssh_key_ids
         resp = self._write("POST", "/servers", f"créer le serveur {name}", body)
         return ServerInfo.from_api(resp["server"]), _action_ids(resp)
 
@@ -287,6 +293,25 @@ class HetznerService:
                            "appliquer le pare-feu",
                            {"apply_to": [{"type": "server", "server": {"id": sid}} for sid in server_ids]})
         return _action_ids(resp)
+
+    def list_firewalls(self, label_selector: str) -> list[FirewallInfo]:
+        return [FirewallInfo.from_api(d) for d in
+                self._get_all("/firewalls", "firewalls", {"label_selector": label_selector})]
+
+    def delete_firewall(self, firewall_id: int) -> None:
+        self._write("DELETE", f"/firewalls/{firewall_id}", "supprimer le pare-feu")
+
+    # --- clés SSH (serveur de construction) ---------------------------------------------------
+    def create_ssh_key(self, name: str, public_key: str, labels: dict[str, str]) -> int:
+        resp = self._write("POST", "/ssh_keys", f"enregistrer la clé SSH {name}",
+                           {"name": name, "public_key": public_key, "labels": labels})
+        return resp["ssh_key"]["id"]
+
+    def list_ssh_keys(self, label_selector: str) -> list[dict]:
+        return self._get_all("/ssh_keys", "ssh_keys", {"label_selector": label_selector})
+
+    def delete_ssh_key(self, key_id: int) -> None:
+        self._write("DELETE", f"/ssh_keys/{key_id}", "supprimer la clé SSH")
 
     # --- IP primaires ----------------------------------------------------------------------
     def create_primary_ip(self, name: str, location: str, labels: dict[str, str]) -> PrimaryIpInfo:

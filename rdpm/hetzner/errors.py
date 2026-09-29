@@ -59,6 +59,7 @@ _API_MESSAGES: dict[str, tuple[str, str | None, bool]] = {
                                 "Demandez une augmentation de limite dans la console Hetzner.", False),
     "primary_ip_limit_exceeded": ("Limite d'IP primaires atteinte", None, False),
     "locked": ("Ressource verrouillée par une action en cours", "Réessayez dans quelques secondes.", True),
+    "resource_in_use": ("Ressource encore utilisée", "Réessayez dans quelques secondes.", True),
     "conflict": ("Conflit avec une action en cours", "Réessayez dans quelques secondes.", True),
     "not_found": ("Ressource introuvable (déjà supprimée ?)", None, False),
     "protected": ("Ressource protégée contre la suppression", "Désépinglez-la d'abord.", False),

@@ -15,22 +15,27 @@ from ...offers import recommended_offer
 from .. import theme as t
 from ..widgets import ghost_button, label, secondary_button
 from .base import Modal, confirm, info
+from .build import BuildDialog
 from .manage import LiveModal
 
 
 class ImportChooser(LiveModal):
-    """Liste de ce qui peut devenir un bureau géré : snapshots, serveurs et pare-feu existants."""
+    """Ce qui peut devenir un bureau géré : une installation neuve, un snapshot ou un serveur existant."""
 
     def __init__(self, app) -> None:
         super().__init__(app, "Nouveau bureau", width=640)
         self.heading("Nouveau bureau",
-                     "Un bureau géré naît d'un snapshot Windows existant (ou d'un serveur en cours). Pour en créer "
-                     "un autre à partir d'un bureau existant, utilisez « Dupliquer… » sur sa carte.")
+                     "Un bureau géré naît d'une installation Windows neuve, d'un snapshot existant ou d'un serveur "
+                     "en cours. Pour copier un bureau existant, utilisez « Dupliquer… » sur sa carte.")
         self.content.pack(fill="x")
         self.buttons(("Fermer", self.cancel, "primary"))
 
     def render(self, parent) -> None:
         g = self.ctrl.grouping
+        self._row(parent, "Créer un Windows de référence",
+                  "Installation automatique de Windows Server (évaluation Microsoft) ou d'une ISO à toi sur un "
+                  "serveur temporaire, puis snapshot. Langue, clavier et fuseau au choix · ≈ 30–40 min.",
+                  self._build, "Créer…")
         if not (g.unmanaged_snapshots or g.unmanaged_servers):
             label(parent, "Rien à importer : tous les snapshots et serveurs du projet sont déjà gérés.", 12,
                   color=t.MUTED, wraplength=580).pack(fill="x", pady=(14, 0))
@@ -43,13 +48,17 @@ class ImportChooser(LiveModal):
             self._row(parent, f"Serveur « {srv.name} »", f"{srv.spec} · {fmt.status(srv.status)}",
                       lambda s=srv: AdoptDialog(self.app, server=s))
 
-    def _row(self, parent, title: str, detail: str, action) -> None:
+    def _row(self, parent, title: str, detail: str, action, button: str = "Importer…") -> None:
         box = ctk.CTkFrame(parent, fg_color=t.SURFACE, corner_radius=10, border_width=1, border_color=t.BORDER)
         box.pack(fill="x", pady=(10, 0))
         box.grid_columnconfigure(0, weight=1)
         label(box, title, 13, "bold").grid(row=0, column=0, sticky="w", padx=12, pady=(10, 0))
         label(box, detail, 12, color=t.MUTED, wraplength=440).grid(row=1, column=0, sticky="w", padx=12, pady=(0, 10))
-        secondary_button(box, "Importer…", action, width=100).grid(row=0, column=1, rowspan=2, padx=12)
+        secondary_button(box, button, action, width=100).grid(row=0, column=1, rowspan=2, padx=12)
+
+    def _build(self) -> None:
+        self.close(None)
+        BuildDialog(self.app)
 
 
 class AdoptDialog(Modal):

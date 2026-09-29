@@ -20,8 +20,8 @@ from typing import Callable
 from . import fmt, netutil, rdp
 from .config import AppConfig, SessionLog
 from .constants import (
-    L_LOC, L_OP_TS, L_TYPE, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING, PROBE_BOOTING_S,
-    PROBE_READY_S, PUBLIC_IP_REFRESH_S, REFRESH_BUSY_S, REFRESH_IDLE_S, STATIC_CACHE_PATH,
+    L_LOC, L_OP_TS, L_TYPE, OP_BUILDING, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING,
+    PROBE_BOOTING_S, PROBE_READY_S, PUBLIC_IP_REFRESH_S, REFRESH_BUSY_S, REFRESH_IDLE_S, STATIC_CACHE_PATH,
 )
 from .events import (
     InventoryLoaded, LogEvent, NeedDecision, OpFinished, OpProgress, ProbeResult, PublicIpResult,
@@ -32,6 +32,7 @@ from .labels import host_label, slugify, unique_slug
 from .models import Desktop, FirewallInfo, Inventory, PrimaryIpInfo, ServerInfo, SnapshotInfo, StaticData, VolumeInfo
 from .offers import best_by_location
 from .ops.base import OpContext, Operation
+from .ops.build import BuildOp, BuildParams
 from .ops.duplicate import DuplicateOp
 from .ops.launch import LaunchOp, LaunchParams
 from .ops.resources import (
@@ -51,10 +52,12 @@ from .state import (
 log = logging.getLogger(__name__)
 
 TRANSITIONAL = {DState.BOOTING, DState.STOPPING, DState.SNAPSHOT_PENDING, DState.LAUNCHING, DState.SAVING,
-                DState.CHECKPOINTING, DState.DISCARDING, DState.DUPLICATING, DState.BUSY, DState.PENDING}
+                DState.CHECKPOINTING, DState.DISCARDING, DState.DUPLICATING, DState.BUILDING, DState.BUSY,
+                DState.PENDING}
 
 OP_NAMES_FR = {OP_SAVING: "sauvegarde", OP_CHECKPOINT: "sauvegarde", OP_DISCARDING: "fermeture",
-               OP_LAUNCHING: "lancement", "duplicating": "duplication"}
+               OP_LAUNCHING: "lancement", "duplicating": "duplication", OP_BUILDING: "construction"}
+PLACEHOLDER_KINDS = ("launch", "duplicate", "build")   # opérations qui font naître une carte sans snapshot
 
 
 @dataclass
@@ -142,7 +145,7 @@ class AppController:
         self.runner = OperationRunner(8)
         self._bg = ThreadPoolExecutor(max_workers=4, thread_name_prefix="bg")
         self.ctx = OpContext(backend, config, creds, sessions, self.queue.put, self.host, self.hard_stop,
-                             lambda: self.static)
+                             lambda: self.static, register_secret=on_secret)
         self.ui = None
 
         self.static: StaticData | None = None
@@ -426,7 +429,7 @@ class AppController:
     def _regroup(self) -> None:
         if self.inventory is None:
             return
-        placeholders = [op.slug for op in self.runner.active() if op.slug and op.kind in ("launch", "duplicate")]
+        placeholders = [op.slug for op in self.runner.active() if op.slug and op.kind in PLACEHOLDER_KINDS]
         names = {op.slug: op.name for op in self.runner.active() if op.slug}
 
         def name_for(slug: str) -> str | None:
@@ -493,6 +496,9 @@ class AppController:
     def _spec(self, d: Desktop) -> str:
         if d.server:
             return f"{d.server.spec} · disque {d.server.disk} Go"
+        op = self.runner.for_slug(d.slug)
+        if isinstance(op, BuildOp):
+            return f"Installation : {op.describe}"
         prefs = self.config.desktops.get(d.slug)
         latest = d.latest or (d.snapshots[0] if d.snapshots else None)
         stype = (prefs.last_type if prefs else None) or (latest.labels.get(L_TYPE) if latest else None)
@@ -508,6 +514,8 @@ class AppController:
             pending = d.pending_snapshot
             if pending:
                 return "Première sauvegarde en cours…"
+            if isinstance(self.runner.for_slug(d.slug), BuildOp):
+                return "Le snapshot de référence sera créé à la fin de l'installation"
             return "Aucune sauvegarde : fermer sans sauvegarder supprimera tout"
         n = sum(1 for s in d.snapshots if s.available)
         extra = f" · {n} versions" if n > 1 else ""
@@ -637,8 +645,9 @@ class AppController:
                                      snap.size_gb * p.image_gb_month, snap))
         for srv in g.tmp_servers:
             if not self.runner.active():
+                what = "installation Windows" if srv.op == OP_BUILDING else "duplication"
                 items.append(DormantItem(f"srv:{srv.id}", "server", f"Serveur temporaire « {srv.name} »",
-                                         f"Reste d'une duplication interrompue · {fmt.eur_h(srv.price_hourly)}",
+                                         f"Reste d'une {what} interrompue · {fmt.eur_h(srv.price_hourly)}",
                                          srv.price_monthly, srv))
         return items
 
@@ -701,6 +710,13 @@ class AppController:
             self.creds.copy_password(slug, new_slug)
             return self._submit(LaunchOp(self.ctx, new_slug, new_name, params))
         return self._submit(DuplicateOp(self.ctx, slug, snapshot, new_slug, new_name))
+
+    def build_windows(self, name: str, params: BuildParams) -> Operation:
+        """Crée un bureau à partir de rien : installation Windows sans surveillance puis snapshot."""
+        if self.mode == "readonly":
+            raise UserError("Mode lecture seule : impossible de créer un serveur")
+        slug = unique_slug(slugify(name), self.known_slugs())
+        return self._submit(BuildOp(self.ctx, slug, name, params))
 
     def add_volume(self, slug: str, size: int, volume_name: str) -> Operation:
         d = self._require(slug)

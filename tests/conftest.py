@@ -41,7 +41,7 @@ def fast_sleep(monkeypatch, tmp_path):
 class Harness:
     def __init__(self, fake: FakeCloud, static: StaticData, tmp_path: Path) -> None:
         self.fake = fake
-        self.backend = HetznerService(fake, probe_fn=fake.probe, public_ip_fn=fake.public_ip)
+        self.backend = HetznerService(fake, probe_fn=fake.probe, public_ip_fn=fake.public_ip, remote=fake.remote)
         self.config = AppConfig(path=tmp_path / "config.json")
         self.config.settings.update(shutdown_timeout_s=60, snapshot_timeout_s=3600)
         self.creds = rdp.MemoryCredentialStore()
