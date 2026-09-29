@@ -1,0 +1,9 @@
+customtkinter>=5.2
+keyring>=25
+hcloud>=2.25,<3
+python-dotenv>=1.0
+requests>=2.31
+
+# développement
+pytest>=8
+requests-mock>=1.11

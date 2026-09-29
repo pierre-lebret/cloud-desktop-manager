@@ -1,0 +1,5479 @@
+{
+ "server_types": [
+  {
+   "id": 22,
+   "name": "cpx11",
+   "architecture": "x86",
+   "cores": 2,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 11",
+   "disk": 40,
+   "memory": 2,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.0280000000000000",
+      "net": "0.0280000000"
+     },
+     "price_monthly": {
+      "gross": "17.4900000000000000",
+      "net": "17.4900000000"
+     },
+     "included_traffic": 1099511627776,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0088000000000000",
+      "net": "0.0088000000"
+     },
+     "price_monthly": {
+      "gross": "5.4900000000000000",
+      "net": "5.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0088000000000000",
+      "net": "0.0088000000"
+     },
+     "price_monthly": {
+      "gross": "5.4900000000000000",
+      "net": "5.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.0280000000000000",
+      "net": "0.0280000000"
+     },
+     "price_monthly": {
+      "gross": "17.4900000000000000",
+      "net": "17.4900000000"
+     },
+     "included_traffic": 1099511627776,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0088000000000000",
+      "net": "0.0088000000"
+     },
+     "price_monthly": {
+      "gross": "5.4900000000000000",
+      "net": "5.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.0160000000000000",
+      "net": "0.0160000000"
+     },
+     "price_monthly": {
+      "gross": "9.9900000000000000",
+      "net": "9.9900000000"
+     },
+     "included_traffic": 1099511627776,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "name": "cpx21",
+   "architecture": "x86",
+   "cores": 3,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 21",
+   "disk": 80,
+   "memory": 4,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.0513000000000000",
+      "net": "0.0513000000"
+     },
+     "price_monthly": {
+      "gross": "31.9900000000000000",
+      "net": "31.9900000000"
+     },
+     "included_traffic": 2199023255552,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0152000000000000",
+      "net": "0.0152000000"
+     },
+     "price_monthly": {
+      "gross": "9.4900000000000000",
+      "net": "9.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0152000000000000",
+      "net": "0.0152000000"
+     },
+     "price_monthly": {
+      "gross": "9.4900000000000000",
+      "net": "9.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.0513000000000000",
+      "net": "0.0513000000"
+     },
+     "price_monthly": {
+      "gross": "31.9900000000000000",
+      "net": "31.9900000000"
+     },
+     "included_traffic": 2199023255552,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0152000000000000",
+      "net": "0.0152000000"
+     },
+     "price_monthly": {
+      "gross": "9.4900000000000000",
+      "net": "9.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.0296000000000000",
+      "net": "0.0296000000"
+     },
+     "price_monthly": {
+      "gross": "18.4900000000000000",
+      "net": "18.4900000000"
+     },
+     "included_traffic": 2199023255552,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    }
+   ]
+  },
+  {
+   "id": 24,
+   "name": "cpx31",
+   "architecture": "x86",
+   "cores": 4,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 31",
+   "disk": 160,
+   "memory": 8,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.1001000000000000",
+      "net": "0.1001000000"
+     },
+     "price_monthly": {
+      "gross": "62.4900000000000000",
+      "net": "62.4900000000"
+     },
+     "included_traffic": 3298534883328,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0280000000000000",
+      "net": "0.0280000000"
+     },
+     "price_monthly": {
+      "gross": "17.4900000000000000",
+      "net": "17.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0280000000000000",
+      "net": "0.0280000000"
+     },
+     "price_monthly": {
+      "gross": "17.4900000000000000",
+      "net": "17.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.1001000000000000",
+      "net": "0.1001000000"
+     },
+     "price_monthly": {
+      "gross": "62.4900000000000000",
+      "net": "62.4900000000"
+     },
+     "included_traffic": 3298534883328,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0280000000000000",
+      "net": "0.0280000000"
+     },
+     "price_monthly": {
+      "gross": "17.4900000000000000",
+      "net": "17.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.0521000000000000",
+      "net": "0.0521000000"
+     },
+     "price_monthly": {
+      "gross": "32.4900000000000000",
+      "net": "32.4900000000"
+     },
+     "included_traffic": 3298534883328,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    }
+   ]
+  },
+  {
+   "id": 25,
+   "name": "cpx41",
+   "architecture": "x86",
+   "cores": 8,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 41",
+   "disk": 240,
+   "memory": 16,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.1931000000000000",
+      "net": "0.1931000000"
+     },
+     "price_monthly": {
+      "gross": "120.4900000000000000",
+      "net": "120.4900000000"
+     },
+     "included_traffic": 4398046511104,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0521000000000000",
+      "net": "0.0521000000"
+     },
+     "price_monthly": {
+      "gross": "32.4900000000000000",
+      "net": "32.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0521000000000000",
+      "net": "0.0521000000"
+     },
+     "price_monthly": {
+      "gross": "32.4900000000000000",
+      "net": "32.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.1931000000000000",
+      "net": "0.1931000000"
+     },
+     "price_monthly": {
+      "gross": "120.4900000000000000",
+      "net": "120.4900000000"
+     },
+     "included_traffic": 4398046511104,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0521000000000000",
+      "net": "0.0521000000"
+     },
+     "price_monthly": {
+      "gross": "32.4900000000000000",
+      "net": "32.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.0889000000000000",
+      "net": "0.0889000000"
+     },
+     "price_monthly": {
+      "gross": "55.4900000000000000",
+      "net": "55.4900000000"
+     },
+     "included_traffic": 4398046511104,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    }
+   ]
+  },
+  {
+   "id": 26,
+   "name": "cpx51",
+   "architecture": "x86",
+   "cores": 16,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 51",
+   "disk": 360,
+   "memory": 32,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.3814000000000000",
+      "net": "0.3814000000"
+     },
+     "price_monthly": {
+      "gross": "237.9900000000000000",
+      "net": "237.9900000000"
+     },
+     "included_traffic": 5497558138880,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.1138000000000000",
+      "net": "0.1138000000"
+     },
+     "price_monthly": {
+      "gross": "70.9900000000000000",
+      "net": "70.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.1138000000000000",
+      "net": "0.1138000000"
+     },
+     "price_monthly": {
+      "gross": "70.9900000000000000",
+      "net": "70.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.3814000000000000",
+      "net": "0.3814000000"
+     },
+     "price_monthly": {
+      "gross": "237.9900000000000000",
+      "net": "237.9900000000"
+     },
+     "included_traffic": 5497558138880,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.1138000000000000",
+      "net": "0.1138000000"
+     },
+     "price_monthly": {
+      "gross": "70.9900000000000000",
+      "net": "70.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.1602000000000000",
+      "net": "0.1602000000"
+     },
+     "price_monthly": {
+      "gross": "99.9900000000000000",
+      "net": "99.9900000000"
+     },
+     "included_traffic": 5497558138880,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": false,
+     "recommended": false,
+     "deprecation": {
+      "announced": "2025-10-16T06:00:00Z",
+      "unavailable_after": "2025-12-31T23:59:59Z"
+     }
+    }
+   ]
+  },
+  {
+   "id": 45,
+   "name": "cax11",
+   "architecture": "arm",
+   "cores": 2,
+   "cpu_type": "shared",
+   "category": "cost_optimized",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CAX11",
+   "disk": 40,
+   "memory": 4,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0096000000000000",
+      "net": "0.0096000000"
+     },
+     "price_monthly": {
+      "gross": "5.9900000000000000",
+      "net": "5.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0096000000000000",
+      "net": "0.0096000000"
+     },
+     "price_monthly": {
+      "gross": "5.9900000000000000",
+      "net": "5.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0096000000000000",
+      "net": "0.0096000000"
+     },
+     "price_monthly": {
+      "gross": "5.9900000000000000",
+      "net": "5.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": true,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 93,
+   "name": "cax21",
+   "architecture": "arm",
+   "cores": 4,
+   "cpu_type": "shared",
+   "category": "cost_optimized",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CAX21",
+   "disk": 80,
+   "memory": 8,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0168000000000000",
+      "net": "0.0168000000"
+     },
+     "price_monthly": {
+      "gross": "10.4900000000000000",
+      "net": "10.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0168000000000000",
+      "net": "0.0168000000"
+     },
+     "price_monthly": {
+      "gross": "10.4900000000000000",
+      "net": "10.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0168000000000000",
+      "net": "0.0168000000"
+     },
+     "price_monthly": {
+      "gross": "10.4900000000000000",
+      "net": "10.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": true,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 94,
+   "name": "cax31",
+   "architecture": "arm",
+   "cores": 8,
+   "cpu_type": "shared",
+   "category": "cost_optimized",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CAX31",
+   "disk": 160,
+   "memory": 16,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0336000000000000",
+      "net": "0.0336000000"
+     },
+     "price_monthly": {
+      "gross": "20.9900000000000000",
+      "net": "20.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0336000000000000",
+      "net": "0.0336000000"
+     },
+     "price_monthly": {
+      "gross": "20.9900000000000000",
+      "net": "20.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0336000000000000",
+      "net": "0.0336000000"
+     },
+     "price_monthly": {
+      "gross": "20.9900000000000000",
+      "net": "20.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": true,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 95,
+   "name": "cax41",
+   "architecture": "arm",
+   "cores": 16,
+   "cpu_type": "shared",
+   "category": "cost_optimized",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CAX41",
+   "disk": 320,
+   "memory": 32,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0657000000000000",
+      "net": "0.0657000000"
+     },
+     "price_monthly": {
+      "gross": "40.9900000000000000",
+      "net": "40.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0657000000000000",
+      "net": "0.0657000000"
+     },
+     "price_monthly": {
+      "gross": "40.9900000000000000",
+      "net": "40.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0657000000000000",
+      "net": "0.0657000000"
+     },
+     "price_monthly": {
+      "gross": "40.9900000000000000",
+      "net": "40.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": true,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 96,
+   "name": "ccx13",
+   "architecture": "x86",
+   "cores": 2,
+   "cpu_type": "dedicated",
+   "category": "general_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CCX13 Dedicated CPU",
+   "disk": 80,
+   "memory": 8,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.0697000000000000",
+      "net": "0.0697000000"
+     },
+     "price_monthly": {
+      "gross": "43.4900000000000000",
+      "net": "43.4900000000"
+     },
+     "included_traffic": 1099511627776,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0689000000000000",
+      "net": "0.0689000000"
+     },
+     "price_monthly": {
+      "gross": "42.9900000000000000",
+      "net": "42.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0689000000000000",
+      "net": "0.0689000000"
+     },
+     "price_monthly": {
+      "gross": "42.9900000000000000",
+      "net": "42.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.0697000000000000",
+      "net": "0.0697000000"
+     },
+     "price_monthly": {
+      "gross": "43.4900000000000000",
+      "net": "43.4900000000"
+     },
+     "included_traffic": 1099511627776,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0689000000000000",
+      "net": "0.0689000000"
+     },
+     "price_monthly": {
+      "gross": "42.9900000000000000",
+      "net": "42.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.0865000000000000",
+      "net": "0.0865000000"
+     },
+     "price_monthly": {
+      "gross": "53.9900000000000000",
+      "net": "53.9900000000"
+     },
+     "included_traffic": 1099511627776,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 97,
+   "name": "ccx23",
+   "architecture": "x86",
+   "cores": 4,
+   "cpu_type": "dedicated",
+   "category": "general_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CCX23 Dedicated CPU",
+   "disk": 160,
+   "memory": 16,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.1402000000000000",
+      "net": "0.1402000000"
+     },
+     "price_monthly": {
+      "gross": "87.4900000000000000",
+      "net": "87.4900000000"
+     },
+     "included_traffic": 2199023255552,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.1378000000000000",
+      "net": "0.1378000000"
+     },
+     "price_monthly": {
+      "gross": "85.9900000000000000",
+      "net": "85.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.1378000000000000",
+      "net": "0.1378000000"
+     },
+     "price_monthly": {
+      "gross": "85.9900000000000000",
+      "net": "85.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.1402000000000000",
+      "net": "0.1402000000"
+     },
+     "price_monthly": {
+      "gross": "87.4900000000000000",
+      "net": "87.4900000000"
+     },
+     "included_traffic": 2199023255552,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.1378000000000000",
+      "net": "0.1378000000"
+     },
+     "price_monthly": {
+      "gross": "85.9900000000000000",
+      "net": "85.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.1739000000000000",
+      "net": "0.1739000000"
+     },
+     "price_monthly": {
+      "gross": "108.4900000000000000",
+      "net": "108.4900000000"
+     },
+     "included_traffic": 2199023255552,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 98,
+   "name": "ccx33",
+   "architecture": "x86",
+   "cores": 8,
+   "cpu_type": "dedicated",
+   "category": "general_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CCX33 Dedicated CPU",
+   "disk": 240,
+   "memory": 32,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.2259000000000000",
+      "net": "0.2259000000"
+     },
+     "price_monthly": {
+      "gross": "140.9900000000000000",
+      "net": "140.9900000000"
+     },
+     "included_traffic": 3298534883328,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.2219000000000000",
+      "net": "0.2219000000"
+     },
+     "price_monthly": {
+      "gross": "138.4900000000000000",
+      "net": "138.4900000000"
+     },
+     "included_traffic": 32985348833280,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.2219000000000000",
+      "net": "0.2219000000"
+     },
+     "price_monthly": {
+      "gross": "138.4900000000000000",
+      "net": "138.4900000000"
+     },
+     "included_traffic": 32985348833280,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.2259000000000000",
+      "net": "0.2259000000"
+     },
+     "price_monthly": {
+      "gross": "140.9900000000000000",
+      "net": "140.9900000000"
+     },
+     "included_traffic": 3298534883328,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.2219000000000000",
+      "net": "0.2219000000"
+     },
+     "price_monthly": {
+      "gross": "138.4900000000000000",
+      "net": "138.4900000000"
+     },
+     "included_traffic": 32985348833280,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.2796000000000000",
+      "net": "0.2796000000"
+     },
+     "price_monthly": {
+      "gross": "174.4900000000000000",
+      "net": "174.4900000000"
+     },
+     "included_traffic": 3298534883328,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 99,
+   "name": "ccx43",
+   "architecture": "x86",
+   "cores": 16,
+   "cpu_type": "dedicated",
+   "category": "general_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CCX43 Dedicated CPU",
+   "disk": 360,
+   "memory": 64,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.4479000000000000",
+      "net": "0.4479000000"
+     },
+     "price_monthly": {
+      "gross": "279.4900000000000000",
+      "net": "279.4900000000"
+     },
+     "included_traffic": 4398046511104,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.4423000000000000",
+      "net": "0.4423000000"
+     },
+     "price_monthly": {
+      "gross": "275.9900000000000000",
+      "net": "275.9900000000"
+     },
+     "included_traffic": 43980465111040,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.4423000000000000",
+      "net": "0.4423000000"
+     },
+     "price_monthly": {
+      "gross": "275.9900000000000000",
+      "net": "275.9900000000"
+     },
+     "included_traffic": 43980465111040,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.4479000000000000",
+      "net": "0.4479000000"
+     },
+     "price_monthly": {
+      "gross": "279.4900000000000000",
+      "net": "279.4900000000"
+     },
+     "included_traffic": 4398046511104,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.4423000000000000",
+      "net": "0.4423000000"
+     },
+     "price_monthly": {
+      "gross": "275.9900000000000000",
+      "net": "275.9900000000"
+     },
+     "included_traffic": 43980465111040,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.5465000000000000",
+      "net": "0.5465000000"
+     },
+     "price_monthly": {
+      "gross": "340.9900000000000000",
+      "net": "340.9900000000"
+     },
+     "included_traffic": 4398046511104,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 100,
+   "name": "ccx53",
+   "architecture": "x86",
+   "cores": 32,
+   "cpu_type": "dedicated",
+   "category": "general_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CCX53 Dedicated CPU",
+   "disk": 600,
+   "memory": 128,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "0.8630000000000000",
+      "net": "0.8630000000"
+     },
+     "price_monthly": {
+      "gross": "538.4900000000000000",
+      "net": "538.4900000000"
+     },
+     "included_traffic": 6597069766656,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.8550000000000000",
+      "net": "0.8550000000"
+     },
+     "price_monthly": {
+      "gross": "533.4900000000000000",
+      "net": "533.4900000000"
+     },
+     "included_traffic": 54975581388800,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.8550000000000000",
+      "net": "0.8550000000"
+     },
+     "price_monthly": {
+      "gross": "533.4900000000000000",
+      "net": "533.4900000000"
+     },
+     "included_traffic": 54975581388800,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "0.8630000000000000",
+      "net": "0.8630000000"
+     },
+     "price_monthly": {
+      "gross": "538.4900000000000000",
+      "net": "538.4900000000"
+     },
+     "included_traffic": 6597069766656,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.8550000000000000",
+      "net": "0.8550000000"
+     },
+     "price_monthly": {
+      "gross": "533.4900000000000000",
+      "net": "533.4900000000"
+     },
+     "included_traffic": 54975581388800,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "1.0449000000000000",
+      "net": "1.0449000000"
+     },
+     "price_monthly": {
+      "gross": "651.9900000000000000",
+      "net": "651.9900000000"
+     },
+     "included_traffic": 6597069766656,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 101,
+   "name": "ccx63",
+   "architecture": "x86",
+   "cores": 48,
+   "cpu_type": "dedicated",
+   "category": "general_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CCX63 Dedicated CPU",
+   "disk": 960,
+   "memory": 192,
+   "prices": [
+    {
+     "location": "ash",
+     "price_hourly": {
+      "gross": "1.3782000000000000",
+      "net": "1.3782000000"
+     },
+     "price_monthly": {
+      "gross": "859.9900000000000000",
+      "net": "859.9900000000"
+     },
+     "included_traffic": 8796093022208,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "1.3678000000000000",
+      "net": "1.3678000000"
+     },
+     "price_monthly": {
+      "gross": "853.4900000000000000",
+      "net": "853.4900000000"
+     },
+     "included_traffic": 65970697666560,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "1.3678000000000000",
+      "net": "1.3678000000"
+     },
+     "price_monthly": {
+      "gross": "853.4900000000000000",
+      "net": "853.4900000000"
+     },
+     "included_traffic": 65970697666560,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hil",
+     "price_hourly": {
+      "gross": "1.3782000000000000",
+      "net": "1.3782000000"
+     },
+     "price_monthly": {
+      "gross": "859.9900000000000000",
+      "net": "859.9900000000"
+     },
+     "included_traffic": 8796093022208,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "1.3678000000000000",
+      "net": "1.3678000000"
+     },
+     "price_monthly": {
+      "gross": "853.4900000000000000",
+      "net": "853.4900000000"
+     },
+     "included_traffic": 65970697666560,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "1.6610000000000000",
+      "net": "1.6610000000"
+     },
+     "price_monthly": {
+      "gross": "1036.4900000000000000",
+      "net": "1036.4900000000"
+     },
+     "included_traffic": 8796093022208,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 4,
+     "name": "ash",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 5,
+     "name": "hil",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 108,
+   "name": "cpx12",
+   "architecture": "x86",
+   "cores": 1,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 12",
+   "disk": 40,
+   "memory": 2,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0184000000000000",
+      "net": "0.0184000000"
+     },
+     "price_monthly": {
+      "gross": "11.4900000000000000",
+      "net": "11.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0184000000000000",
+      "net": "0.0184000000"
+     },
+     "price_monthly": {
+      "gross": "11.4900000000000000",
+      "net": "11.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0184000000000000",
+      "net": "0.0184000000"
+     },
+     "price_monthly": {
+      "gross": "11.4900000000000000",
+      "net": "11.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.0248000000000000",
+      "net": "0.0248000000"
+     },
+     "price_monthly": {
+      "gross": "15.4900000000000000",
+      "net": "15.4900000000"
+     },
+     "included_traffic": 549755813888,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 109,
+   "name": "cpx22",
+   "architecture": "x86",
+   "cores": 2,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 22",
+   "disk": 80,
+   "memory": 4,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0312000000000000",
+      "net": "0.0312000000"
+     },
+     "price_monthly": {
+      "gross": "19.4900000000000000",
+      "net": "19.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0312000000000000",
+      "net": "0.0312000000"
+     },
+     "price_monthly": {
+      "gross": "19.4900000000000000",
+      "net": "19.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0312000000000000",
+      "net": "0.0312000000"
+     },
+     "price_monthly": {
+      "gross": "19.4900000000000000",
+      "net": "19.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.0425000000000000",
+      "net": "0.0425000000"
+     },
+     "price_monthly": {
+      "gross": "26.4900000000000000",
+      "net": "26.4900000000"
+     },
+     "included_traffic": 1099511627776,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 110,
+   "name": "cpx32",
+   "architecture": "x86",
+   "cores": 4,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 32",
+   "disk": 160,
+   "memory": 8,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0569000000000000",
+      "net": "0.0569000000"
+     },
+     "price_monthly": {
+      "gross": "35.4900000000000000",
+      "net": "35.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0569000000000000",
+      "net": "0.0569000000"
+     },
+     "price_monthly": {
+      "gross": "35.4900000000000000",
+      "net": "35.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0569000000000000",
+      "net": "0.0569000000"
+     },
+     "price_monthly": {
+      "gross": "35.4900000000000000",
+      "net": "35.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.0785000000000000",
+      "net": "0.0785000000"
+     },
+     "price_monthly": {
+      "gross": "48.9900000000000000",
+      "net": "48.9900000000"
+     },
+     "included_traffic": 2199023255552,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 111,
+   "name": "cpx42",
+   "architecture": "x86",
+   "cores": 8,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 42",
+   "disk": 320,
+   "memory": 16,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.1114000000000000",
+      "net": "0.1114000000"
+     },
+     "price_monthly": {
+      "gross": "69.4900000000000000",
+      "net": "69.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.1114000000000000",
+      "net": "0.1114000000"
+     },
+     "price_monthly": {
+      "gross": "69.4900000000000000",
+      "net": "69.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.1114000000000000",
+      "net": "0.1114000000"
+     },
+     "price_monthly": {
+      "gross": "69.4900000000000000",
+      "net": "69.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.1498000000000000",
+      "net": "0.1498000000"
+     },
+     "price_monthly": {
+      "gross": "93.4900000000000000",
+      "net": "93.4900000000"
+     },
+     "included_traffic": 3298534883328,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 112,
+   "name": "cpx52",
+   "architecture": "x86",
+   "cores": 12,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 52",
+   "disk": 480,
+   "memory": 24,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.1610000000000000",
+      "net": "0.1610000000"
+     },
+     "price_monthly": {
+      "gross": "100.4900000000000000",
+      "net": "100.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.1610000000000000",
+      "net": "0.1610000000"
+     },
+     "price_monthly": {
+      "gross": "100.4900000000000000",
+      "net": "100.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.1610000000000000",
+      "net": "0.1610000000"
+     },
+     "price_monthly": {
+      "gross": "100.4900000000000000",
+      "net": "100.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.2155000000000000",
+      "net": "0.2155000000"
+     },
+     "price_monthly": {
+      "gross": "134.4900000000000000",
+      "net": "134.4900000000"
+     },
+     "included_traffic": 4398046511104,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 113,
+   "name": "cpx62",
+   "architecture": "x86",
+   "cores": 16,
+   "cpu_type": "shared",
+   "category": "regular_purpose",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CPX 62",
+   "disk": 640,
+   "memory": 32,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.2083000000000000",
+      "net": "0.2083000000"
+     },
+     "price_monthly": {
+      "gross": "129.9900000000000000",
+      "net": "129.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.2083000000000000",
+      "net": "0.2083000000"
+     },
+     "price_monthly": {
+      "gross": "129.9900000000000000",
+      "net": "129.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.2083000000000000",
+      "net": "0.2083000000"
+     },
+     "price_monthly": {
+      "gross": "129.9900000000000000",
+      "net": "129.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "sin",
+     "price_hourly": {
+      "gross": "0.2756000000000000",
+      "net": "0.2756000000"
+     },
+     "price_monthly": {
+      "gross": "171.9900000000000000",
+      "net": "171.9900000000"
+     },
+     "included_traffic": 5497558138880,
+     "price_per_tb_traffic": {
+      "gross": "7.4000000000000000",
+      "net": "7.4000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": true,
+     "recommended": true,
+     "deprecation": null
+    },
+    {
+     "id": 6,
+     "name": "sin",
+     "available": true,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 114,
+   "name": "cx23",
+   "architecture": "x86",
+   "cores": 2,
+   "cpu_type": "shared",
+   "category": "cost_optimized",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CX 23",
+   "disk": 40,
+   "memory": 4,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0088000000000000",
+      "net": "0.0088000000"
+     },
+     "price_monthly": {
+      "gross": "5.4900000000000000",
+      "net": "5.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0088000000000000",
+      "net": "0.0088000000"
+     },
+     "price_monthly": {
+      "gross": "5.4900000000000000",
+      "net": "5.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0088000000000000",
+      "net": "0.0088000000"
+     },
+     "price_monthly": {
+      "gross": "5.4900000000000000",
+      "net": "5.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 115,
+   "name": "cx33",
+   "architecture": "x86",
+   "cores": 4,
+   "cpu_type": "shared",
+   "category": "cost_optimized",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CX 33",
+   "disk": 80,
+   "memory": 8,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0136000000000000",
+      "net": "0.0136000000"
+     },
+     "price_monthly": {
+      "gross": "8.4900000000000000",
+      "net": "8.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0136000000000000",
+      "net": "0.0136000000"
+     },
+     "price_monthly": {
+      "gross": "8.4900000000000000",
+      "net": "8.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0136000000000000",
+      "net": "0.0136000000"
+     },
+     "price_monthly": {
+      "gross": "8.4900000000000000",
+      "net": "8.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 116,
+   "name": "cx43",
+   "architecture": "x86",
+   "cores": 8,
+   "cpu_type": "shared",
+   "category": "cost_optimized",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CX 43",
+   "disk": 160,
+   "memory": 16,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0256000000000000",
+      "net": "0.0256000000"
+     },
+     "price_monthly": {
+      "gross": "15.9900000000000000",
+      "net": "15.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0256000000000000",
+      "net": "0.0256000000"
+     },
+     "price_monthly": {
+      "gross": "15.9900000000000000",
+      "net": "15.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0256000000000000",
+      "net": "0.0256000000"
+     },
+     "price_monthly": {
+      "gross": "15.9900000000000000",
+      "net": "15.9900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  },
+  {
+   "id": 117,
+   "name": "cx53",
+   "architecture": "x86",
+   "cores": 16,
+   "cpu_type": "shared",
+   "category": "cost_optimized",
+   "deprecated": false,
+   "deprecation": null,
+   "description": "CX 53",
+   "disk": 320,
+   "memory": 32,
+   "prices": [
+    {
+     "location": "fsn1",
+     "price_hourly": {
+      "gross": "0.0473000000000000",
+      "net": "0.0473000000"
+     },
+     "price_monthly": {
+      "gross": "29.4900000000000000",
+      "net": "29.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "hel1",
+     "price_hourly": {
+      "gross": "0.0473000000000000",
+      "net": "0.0473000000"
+     },
+     "price_monthly": {
+      "gross": "29.4900000000000000",
+      "net": "29.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    },
+    {
+     "location": "nbg1",
+     "price_hourly": {
+      "gross": "0.0473000000000000",
+      "net": "0.0473000000"
+     },
+     "price_monthly": {
+      "gross": "29.4900000000000000",
+      "net": "29.4900000000"
+     },
+     "included_traffic": 21990232555520,
+     "price_per_tb_traffic": {
+      "gross": "1.0000000000000000",
+      "net": "1.0000000000"
+     }
+    }
+   ],
+   "storage_type": "local",
+   "locations": [
+    {
+     "id": 1,
+     "name": "fsn1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 2,
+     "name": "nbg1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    },
+    {
+     "id": 3,
+     "name": "hel1",
+     "available": false,
+     "recommended": false,
+     "deprecation": null
+    }
+   ]
+  }
+ ],
+ "locations": [
+  {
+   "city": "Falkenstein",
+   "country": "DE",
+   "description": "Falkenstein DC Park 1",
+   "id": 1,
+   "latitude": 50.47612,
+   "longitude": 12.370071,
+   "name": "fsn1",
+   "network_zone": "eu-central"
+  },
+  {
+   "city": "Nuremberg",
+   "country": "DE",
+   "description": "Nuremberg DC Park 1",
+   "id": 2,
+   "latitude": 49.452102,
+   "longitude": 11.076665,
+   "name": "nbg1",
+   "network_zone": "eu-central"
+  },
+  {
+   "city": "Helsinki",
+   "country": "FI",
+   "description": "Helsinki DC Park 1",
+   "id": 3,
+   "latitude": 60.169855,
+   "longitude": 24.938379,
+   "name": "hel1",
+   "network_zone": "eu-central"
+  },
+  {
+   "city": "Ashburn, VA",
+   "country": "US",
+   "description": "Ashburn, VA",
+   "id": 4,
+   "latitude": 39.045821,
+   "longitude": -77.487073,
+   "name": "ash",
+   "network_zone": "us-east"
+  },
+  {
+   "city": "Hillsboro, OR",
+   "country": "US",
+   "description": "Hillsboro, OR",
+   "id": 5,
+   "latitude": 45.54222,
+   "longitude": -122.951924,
+   "name": "hil",
+   "network_zone": "us-west"
+  },
+  {
+   "city": "Singapore",
+   "country": "SG",
+   "description": "Singapore",
+   "id": 6,
+   "latitude": 1.283333,
+   "longitude": 103.833333,
+   "name": "sin",
+   "network_zone": "ap-southeast"
+  }
+ ],
+ "pricing": {
+  "currency": "EUR",
+  "vat_rate": "0.000000",
+  "primary_ips": [
+   {
+    "type": "ipv4",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0008000000",
+       "gross": "0.0008000000000000"
+      },
+      "price_monthly": {
+       "net": "0.5000000000",
+       "gross": "0.5000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0008000000",
+       "gross": "0.0008000000000000"
+      },
+      "price_monthly": {
+       "net": "0.5000000000",
+       "gross": "0.5000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0008000000",
+       "gross": "0.0008000000000000"
+      },
+      "price_monthly": {
+       "net": "0.5000000000",
+       "gross": "0.5000000000000000"
+      }
+     },
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.0008000000",
+       "gross": "0.0008000000000000"
+      },
+      "price_monthly": {
+       "net": "0.5000000000",
+       "gross": "0.5000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.0008000000",
+       "gross": "0.0008000000000000"
+      },
+      "price_monthly": {
+       "net": "0.5000000000",
+       "gross": "0.5000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0008000000",
+       "gross": "0.0008000000000000"
+      },
+      "price_monthly": {
+       "net": "0.5000000000",
+       "gross": "0.5000000000000000"
+      }
+     }
+    ]
+   }
+  ],
+  "image": {
+   "price_per_gb_month": {
+    "net": "0.0143000000",
+    "gross": "0.0143000000000000"
+   }
+  },
+  "volume": {
+   "price_per_gb_month": {
+    "net": "0.0572000000",
+    "gross": "0.0572000000000000"
+   }
+  },
+  "server_types": [
+   {
+    "id": 22,
+    "name": "cpx11",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0088000000",
+       "gross": "0.0088000000000000"
+      },
+      "price_monthly": {
+       "net": "5.4900000000",
+       "gross": "5.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0088000000",
+       "gross": "0.0088000000000000"
+      },
+      "price_monthly": {
+       "net": "5.4900000000",
+       "gross": "5.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0088000000",
+       "gross": "0.0088000000000000"
+      },
+      "price_monthly": {
+       "net": "5.4900000000",
+       "gross": "5.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0160000000",
+       "gross": "0.0160000000000000"
+      },
+      "price_monthly": {
+       "net": "9.9900000000",
+       "gross": "9.9900000000000000"
+      },
+      "included_traffic": 1099511627776,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     },
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.0280000000",
+       "gross": "0.0280000000000000"
+      },
+      "price_monthly": {
+       "net": "17.4900000000",
+       "gross": "17.4900000000000000"
+      },
+      "included_traffic": 1099511627776,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.0280000000",
+       "gross": "0.0280000000000000"
+      },
+      "price_monthly": {
+       "net": "17.4900000000",
+       "gross": "17.4900000000000000"
+      },
+      "included_traffic": 1099511627776,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 23,
+    "name": "cpx21",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0152000000",
+       "gross": "0.0152000000000000"
+      },
+      "price_monthly": {
+       "net": "9.4900000000",
+       "gross": "9.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0152000000",
+       "gross": "0.0152000000000000"
+      },
+      "price_monthly": {
+       "net": "9.4900000000",
+       "gross": "9.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0152000000",
+       "gross": "0.0152000000000000"
+      },
+      "price_monthly": {
+       "net": "9.4900000000",
+       "gross": "9.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0296000000",
+       "gross": "0.0296000000000000"
+      },
+      "price_monthly": {
+       "net": "18.4900000000",
+       "gross": "18.4900000000000000"
+      },
+      "included_traffic": 2199023255552,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     },
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.0513000000",
+       "gross": "0.0513000000000000"
+      },
+      "price_monthly": {
+       "net": "31.9900000000",
+       "gross": "31.9900000000000000"
+      },
+      "included_traffic": 2199023255552,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.0513000000",
+       "gross": "0.0513000000000000"
+      },
+      "price_monthly": {
+       "net": "31.9900000000",
+       "gross": "31.9900000000000000"
+      },
+      "included_traffic": 2199023255552,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 24,
+    "name": "cpx31",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0280000000",
+       "gross": "0.0280000000000000"
+      },
+      "price_monthly": {
+       "net": "17.4900000000",
+       "gross": "17.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0280000000",
+       "gross": "0.0280000000000000"
+      },
+      "price_monthly": {
+       "net": "17.4900000000",
+       "gross": "17.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0280000000",
+       "gross": "0.0280000000000000"
+      },
+      "price_monthly": {
+       "net": "17.4900000000",
+       "gross": "17.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0521000000",
+       "gross": "0.0521000000000000"
+      },
+      "price_monthly": {
+       "net": "32.4900000000",
+       "gross": "32.4900000000000000"
+      },
+      "included_traffic": 3298534883328,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     },
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.1001000000",
+       "gross": "0.1001000000000000"
+      },
+      "price_monthly": {
+       "net": "62.4900000000",
+       "gross": "62.4900000000000000"
+      },
+      "included_traffic": 3298534883328,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.1001000000",
+       "gross": "0.1001000000000000"
+      },
+      "price_monthly": {
+       "net": "62.4900000000",
+       "gross": "62.4900000000000000"
+      },
+      "included_traffic": 3298534883328,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 25,
+    "name": "cpx41",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0521000000",
+       "gross": "0.0521000000000000"
+      },
+      "price_monthly": {
+       "net": "32.4900000000",
+       "gross": "32.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0521000000",
+       "gross": "0.0521000000000000"
+      },
+      "price_monthly": {
+       "net": "32.4900000000",
+       "gross": "32.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0521000000",
+       "gross": "0.0521000000000000"
+      },
+      "price_monthly": {
+       "net": "32.4900000000",
+       "gross": "32.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0889000000",
+       "gross": "0.0889000000000000"
+      },
+      "price_monthly": {
+       "net": "55.4900000000",
+       "gross": "55.4900000000000000"
+      },
+      "included_traffic": 4398046511104,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     },
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.1931000000",
+       "gross": "0.1931000000000000"
+      },
+      "price_monthly": {
+       "net": "120.4900000000",
+       "gross": "120.4900000000000000"
+      },
+      "included_traffic": 4398046511104,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.1931000000",
+       "gross": "0.1931000000000000"
+      },
+      "price_monthly": {
+       "net": "120.4900000000",
+       "gross": "120.4900000000000000"
+      },
+      "included_traffic": 4398046511104,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 26,
+    "name": "cpx51",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.1138000000",
+       "gross": "0.1138000000000000"
+      },
+      "price_monthly": {
+       "net": "70.9900000000",
+       "gross": "70.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.1138000000",
+       "gross": "0.1138000000000000"
+      },
+      "price_monthly": {
+       "net": "70.9900000000",
+       "gross": "70.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.1138000000",
+       "gross": "0.1138000000000000"
+      },
+      "price_monthly": {
+       "net": "70.9900000000",
+       "gross": "70.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.1602000000",
+       "gross": "0.1602000000000000"
+      },
+      "price_monthly": {
+       "net": "99.9900000000",
+       "gross": "99.9900000000000000"
+      },
+      "included_traffic": 5497558138880,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     },
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.3814000000",
+       "gross": "0.3814000000000000"
+      },
+      "price_monthly": {
+       "net": "237.9900000000",
+       "gross": "237.9900000000000000"
+      },
+      "included_traffic": 5497558138880,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.3814000000",
+       "gross": "0.3814000000000000"
+      },
+      "price_monthly": {
+       "net": "237.9900000000",
+       "gross": "237.9900000000000000"
+      },
+      "included_traffic": 5497558138880,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 45,
+    "name": "cax11",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0096000000",
+       "gross": "0.0096000000000000"
+      },
+      "price_monthly": {
+       "net": "5.9900000000",
+       "gross": "5.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0096000000",
+       "gross": "0.0096000000000000"
+      },
+      "price_monthly": {
+       "net": "5.9900000000",
+       "gross": "5.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0096000000",
+       "gross": "0.0096000000000000"
+      },
+      "price_monthly": {
+       "net": "5.9900000000",
+       "gross": "5.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 93,
+    "name": "cax21",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0168000000",
+       "gross": "0.0168000000000000"
+      },
+      "price_monthly": {
+       "net": "10.4900000000",
+       "gross": "10.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0168000000",
+       "gross": "0.0168000000000000"
+      },
+      "price_monthly": {
+       "net": "10.4900000000",
+       "gross": "10.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0168000000",
+       "gross": "0.0168000000000000"
+      },
+      "price_monthly": {
+       "net": "10.4900000000",
+       "gross": "10.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 94,
+    "name": "cax31",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0336000000",
+       "gross": "0.0336000000000000"
+      },
+      "price_monthly": {
+       "net": "20.9900000000",
+       "gross": "20.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0336000000",
+       "gross": "0.0336000000000000"
+      },
+      "price_monthly": {
+       "net": "20.9900000000",
+       "gross": "20.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0336000000",
+       "gross": "0.0336000000000000"
+      },
+      "price_monthly": {
+       "net": "20.9900000000",
+       "gross": "20.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 95,
+    "name": "cax41",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0657000000",
+       "gross": "0.0657000000000000"
+      },
+      "price_monthly": {
+       "net": "40.9900000000",
+       "gross": "40.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0657000000",
+       "gross": "0.0657000000000000"
+      },
+      "price_monthly": {
+       "net": "40.9900000000",
+       "gross": "40.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0657000000",
+       "gross": "0.0657000000000000"
+      },
+      "price_monthly": {
+       "net": "40.9900000000",
+       "gross": "40.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 96,
+    "name": "ccx13",
+    "prices": [
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.0697000000",
+       "gross": "0.0697000000000000"
+      },
+      "price_monthly": {
+       "net": "43.4900000000",
+       "gross": "43.4900000000000000"
+      },
+      "included_traffic": 1099511627776,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0689000000",
+       "gross": "0.0689000000000000"
+      },
+      "price_monthly": {
+       "net": "42.9900000000",
+       "gross": "42.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0689000000",
+       "gross": "0.0689000000000000"
+      },
+      "price_monthly": {
+       "net": "42.9900000000",
+       "gross": "42.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.0697000000",
+       "gross": "0.0697000000000000"
+      },
+      "price_monthly": {
+       "net": "43.4900000000",
+       "gross": "43.4900000000000000"
+      },
+      "included_traffic": 1099511627776,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0689000000",
+       "gross": "0.0689000000000000"
+      },
+      "price_monthly": {
+       "net": "42.9900000000",
+       "gross": "42.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0865000000",
+       "gross": "0.0865000000000000"
+      },
+      "price_monthly": {
+       "net": "53.9900000000",
+       "gross": "53.9900000000000000"
+      },
+      "included_traffic": 1099511627776,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 97,
+    "name": "ccx23",
+    "prices": [
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.1402000000",
+       "gross": "0.1402000000000000"
+      },
+      "price_monthly": {
+       "net": "87.4900000000",
+       "gross": "87.4900000000000000"
+      },
+      "included_traffic": 2199023255552,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.1378000000",
+       "gross": "0.1378000000000000"
+      },
+      "price_monthly": {
+       "net": "85.9900000000",
+       "gross": "85.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.1378000000",
+       "gross": "0.1378000000000000"
+      },
+      "price_monthly": {
+       "net": "85.9900000000",
+       "gross": "85.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.1402000000",
+       "gross": "0.1402000000000000"
+      },
+      "price_monthly": {
+       "net": "87.4900000000",
+       "gross": "87.4900000000000000"
+      },
+      "included_traffic": 2199023255552,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.1378000000",
+       "gross": "0.1378000000000000"
+      },
+      "price_monthly": {
+       "net": "85.9900000000",
+       "gross": "85.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.1739000000",
+       "gross": "0.1739000000000000"
+      },
+      "price_monthly": {
+       "net": "108.4900000000",
+       "gross": "108.4900000000000000"
+      },
+      "included_traffic": 2199023255552,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 98,
+    "name": "ccx33",
+    "prices": [
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.2259000000",
+       "gross": "0.2259000000000000"
+      },
+      "price_monthly": {
+       "net": "140.9900000000",
+       "gross": "140.9900000000000000"
+      },
+      "included_traffic": 3298534883328,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.2219000000",
+       "gross": "0.2219000000000000"
+      },
+      "price_monthly": {
+       "net": "138.4900000000",
+       "gross": "138.4900000000000000"
+      },
+      "included_traffic": 32985348833280,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.2219000000",
+       "gross": "0.2219000000000000"
+      },
+      "price_monthly": {
+       "net": "138.4900000000",
+       "gross": "138.4900000000000000"
+      },
+      "included_traffic": 32985348833280,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.2259000000",
+       "gross": "0.2259000000000000"
+      },
+      "price_monthly": {
+       "net": "140.9900000000",
+       "gross": "140.9900000000000000"
+      },
+      "included_traffic": 3298534883328,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.2219000000",
+       "gross": "0.2219000000000000"
+      },
+      "price_monthly": {
+       "net": "138.4900000000",
+       "gross": "138.4900000000000000"
+      },
+      "included_traffic": 32985348833280,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.2796000000",
+       "gross": "0.2796000000000000"
+      },
+      "price_monthly": {
+       "net": "174.4900000000",
+       "gross": "174.4900000000000000"
+      },
+      "included_traffic": 3298534883328,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 99,
+    "name": "ccx43",
+    "prices": [
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.4479000000",
+       "gross": "0.4479000000000000"
+      },
+      "price_monthly": {
+       "net": "279.4900000000",
+       "gross": "279.4900000000000000"
+      },
+      "included_traffic": 4398046511104,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.4423000000",
+       "gross": "0.4423000000000000"
+      },
+      "price_monthly": {
+       "net": "275.9900000000",
+       "gross": "275.9900000000000000"
+      },
+      "included_traffic": 43980465111040,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.4423000000",
+       "gross": "0.4423000000000000"
+      },
+      "price_monthly": {
+       "net": "275.9900000000",
+       "gross": "275.9900000000000000"
+      },
+      "included_traffic": 43980465111040,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.4479000000",
+       "gross": "0.4479000000000000"
+      },
+      "price_monthly": {
+       "net": "279.4900000000",
+       "gross": "279.4900000000000000"
+      },
+      "included_traffic": 4398046511104,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.4423000000",
+       "gross": "0.4423000000000000"
+      },
+      "price_monthly": {
+       "net": "275.9900000000",
+       "gross": "275.9900000000000000"
+      },
+      "included_traffic": 43980465111040,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.5465000000",
+       "gross": "0.5465000000000000"
+      },
+      "price_monthly": {
+       "net": "340.9900000000",
+       "gross": "340.9900000000000000"
+      },
+      "included_traffic": 4398046511104,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 100,
+    "name": "ccx53",
+    "prices": [
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "0.8630000000",
+       "gross": "0.8630000000000000"
+      },
+      "price_monthly": {
+       "net": "538.4900000000",
+       "gross": "538.4900000000000000"
+      },
+      "included_traffic": 6597069766656,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.8550000000",
+       "gross": "0.8550000000000000"
+      },
+      "price_monthly": {
+       "net": "533.4900000000",
+       "gross": "533.4900000000000000"
+      },
+      "included_traffic": 54975581388800,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.8550000000",
+       "gross": "0.8550000000000000"
+      },
+      "price_monthly": {
+       "net": "533.4900000000",
+       "gross": "533.4900000000000000"
+      },
+      "included_traffic": 54975581388800,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "0.8630000000",
+       "gross": "0.8630000000000000"
+      },
+      "price_monthly": {
+       "net": "538.4900000000",
+       "gross": "538.4900000000000000"
+      },
+      "included_traffic": 6597069766656,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.8550000000",
+       "gross": "0.8550000000000000"
+      },
+      "price_monthly": {
+       "net": "533.4900000000",
+       "gross": "533.4900000000000000"
+      },
+      "included_traffic": 54975581388800,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "1.0449000000",
+       "gross": "1.0449000000000000"
+      },
+      "price_monthly": {
+       "net": "651.9900000000",
+       "gross": "651.9900000000000000"
+      },
+      "included_traffic": 6597069766656,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 101,
+    "name": "ccx63",
+    "prices": [
+     {
+      "location": "ash",
+      "price_hourly": {
+       "net": "1.3782000000",
+       "gross": "1.3782000000000000"
+      },
+      "price_monthly": {
+       "net": "859.9900000000",
+       "gross": "859.9900000000000000"
+      },
+      "included_traffic": 8796093022208,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "1.3678000000",
+       "gross": "1.3678000000000000"
+      },
+      "price_monthly": {
+       "net": "853.4900000000",
+       "gross": "853.4900000000000000"
+      },
+      "included_traffic": 65970697666560,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "1.3678000000",
+       "gross": "1.3678000000000000"
+      },
+      "price_monthly": {
+       "net": "853.4900000000",
+       "gross": "853.4900000000000000"
+      },
+      "included_traffic": 65970697666560,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hil",
+      "price_hourly": {
+       "net": "1.3782000000",
+       "gross": "1.3782000000000000"
+      },
+      "price_monthly": {
+       "net": "859.9900000000",
+       "gross": "859.9900000000000000"
+      },
+      "included_traffic": 8796093022208,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "1.3678000000",
+       "gross": "1.3678000000000000"
+      },
+      "price_monthly": {
+       "net": "853.4900000000",
+       "gross": "853.4900000000000000"
+      },
+      "included_traffic": 65970697666560,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "1.6610000000",
+       "gross": "1.6610000000000000"
+      },
+      "price_monthly": {
+       "net": "1036.4900000000",
+       "gross": "1036.4900000000000000"
+      },
+      "included_traffic": 8796093022208,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 104,
+    "name": "cx22",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0072000000",
+       "gross": "0.0072000000000000"
+      },
+      "price_monthly": {
+       "net": "4.4900000000",
+       "gross": "4.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0072000000",
+       "gross": "0.0072000000000000"
+      },
+      "price_monthly": {
+       "net": "4.4900000000",
+       "gross": "4.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0072000000",
+       "gross": "0.0072000000000000"
+      },
+      "price_monthly": {
+       "net": "4.4900000000",
+       "gross": "4.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 105,
+    "name": "cx32",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0136000000",
+       "gross": "0.0136000000000000"
+      },
+      "price_monthly": {
+       "net": "8.4900000000",
+       "gross": "8.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0136000000",
+       "gross": "0.0136000000000000"
+      },
+      "price_monthly": {
+       "net": "8.4900000000",
+       "gross": "8.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0136000000",
+       "gross": "0.0136000000000000"
+      },
+      "price_monthly": {
+       "net": "8.4900000000",
+       "gross": "8.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 106,
+    "name": "cx42",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0336000000",
+       "gross": "0.0336000000000000"
+      },
+      "price_monthly": {
+       "net": "20.9900000000",
+       "gross": "20.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0336000000",
+       "gross": "0.0336000000000000"
+      },
+      "price_monthly": {
+       "net": "20.9900000000",
+       "gross": "20.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0336000000",
+       "gross": "0.0336000000000000"
+      },
+      "price_monthly": {
+       "net": "20.9900000000",
+       "gross": "20.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 107,
+    "name": "cx52",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0665000000",
+       "gross": "0.0665000000000000"
+      },
+      "price_monthly": {
+       "net": "41.4900000000",
+       "gross": "41.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0665000000",
+       "gross": "0.0665000000000000"
+      },
+      "price_monthly": {
+       "net": "41.4900000000",
+       "gross": "41.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0665000000",
+       "gross": "0.0665000000000000"
+      },
+      "price_monthly": {
+       "net": "41.4900000000",
+       "gross": "41.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 108,
+    "name": "cpx12",
+    "prices": [
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0248000000",
+       "gross": "0.0248000000000000"
+      },
+      "price_monthly": {
+       "net": "15.4900000000",
+       "gross": "15.4900000000000000"
+      },
+      "included_traffic": 549755813888,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0184000000",
+       "gross": "0.0184000000000000"
+      },
+      "price_monthly": {
+       "net": "11.4900000000",
+       "gross": "11.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0184000000",
+       "gross": "0.0184000000000000"
+      },
+      "price_monthly": {
+       "net": "11.4900000000",
+       "gross": "11.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0184000000",
+       "gross": "0.0184000000000000"
+      },
+      "price_monthly": {
+       "net": "11.4900000000",
+       "gross": "11.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 109,
+    "name": "cpx22",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0312000000",
+       "gross": "0.0312000000000000"
+      },
+      "price_monthly": {
+       "net": "19.4900000000",
+       "gross": "19.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0312000000",
+       "gross": "0.0312000000000000"
+      },
+      "price_monthly": {
+       "net": "19.4900000000",
+       "gross": "19.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0312000000",
+       "gross": "0.0312000000000000"
+      },
+      "price_monthly": {
+       "net": "19.4900000000",
+       "gross": "19.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0425000000",
+       "gross": "0.0425000000000000"
+      },
+      "price_monthly": {
+       "net": "26.4900000000",
+       "gross": "26.4900000000000000"
+      },
+      "included_traffic": 1099511627776,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 110,
+    "name": "cpx32",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0569000000",
+       "gross": "0.0569000000000000"
+      },
+      "price_monthly": {
+       "net": "35.4900000000",
+       "gross": "35.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0569000000",
+       "gross": "0.0569000000000000"
+      },
+      "price_monthly": {
+       "net": "35.4900000000",
+       "gross": "35.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0569000000",
+       "gross": "0.0569000000000000"
+      },
+      "price_monthly": {
+       "net": "35.4900000000",
+       "gross": "35.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.0785000000",
+       "gross": "0.0785000000000000"
+      },
+      "price_monthly": {
+       "net": "48.9900000000",
+       "gross": "48.9900000000000000"
+      },
+      "included_traffic": 2199023255552,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 111,
+    "name": "cpx42",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.1114000000",
+       "gross": "0.1114000000000000"
+      },
+      "price_monthly": {
+       "net": "69.4900000000",
+       "gross": "69.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.1114000000",
+       "gross": "0.1114000000000000"
+      },
+      "price_monthly": {
+       "net": "69.4900000000",
+       "gross": "69.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.1114000000",
+       "gross": "0.1114000000000000"
+      },
+      "price_monthly": {
+       "net": "69.4900000000",
+       "gross": "69.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.1498000000",
+       "gross": "0.1498000000000000"
+      },
+      "price_monthly": {
+       "net": "93.4900000000",
+       "gross": "93.4900000000000000"
+      },
+      "included_traffic": 3298534883328,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 112,
+    "name": "cpx52",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.1610000000",
+       "gross": "0.1610000000000000"
+      },
+      "price_monthly": {
+       "net": "100.4900000000",
+       "gross": "100.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.1610000000",
+       "gross": "0.1610000000000000"
+      },
+      "price_monthly": {
+       "net": "100.4900000000",
+       "gross": "100.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.1610000000",
+       "gross": "0.1610000000000000"
+      },
+      "price_monthly": {
+       "net": "100.4900000000",
+       "gross": "100.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.2155000000",
+       "gross": "0.2155000000000000"
+      },
+      "price_monthly": {
+       "net": "134.4900000000",
+       "gross": "134.4900000000000000"
+      },
+      "included_traffic": 4398046511104,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 113,
+    "name": "cpx62",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.2083000000",
+       "gross": "0.2083000000000000"
+      },
+      "price_monthly": {
+       "net": "129.9900000000",
+       "gross": "129.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.2083000000",
+       "gross": "0.2083000000000000"
+      },
+      "price_monthly": {
+       "net": "129.9900000000",
+       "gross": "129.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.2083000000",
+       "gross": "0.2083000000000000"
+      },
+      "price_monthly": {
+       "net": "129.9900000000",
+       "gross": "129.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "sin",
+      "price_hourly": {
+       "net": "0.2756000000",
+       "gross": "0.2756000000000000"
+      },
+      "price_monthly": {
+       "net": "171.9900000000",
+       "gross": "171.9900000000000000"
+      },
+      "included_traffic": 5497558138880,
+      "price_per_tb_traffic": {
+       "net": "7.4000000000",
+       "gross": "7.4000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 114,
+    "name": "cx23",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0088000000",
+       "gross": "0.0088000000000000"
+      },
+      "price_monthly": {
+       "net": "5.4900000000",
+       "gross": "5.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0088000000",
+       "gross": "0.0088000000000000"
+      },
+      "price_monthly": {
+       "net": "5.4900000000",
+       "gross": "5.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0088000000",
+       "gross": "0.0088000000000000"
+      },
+      "price_monthly": {
+       "net": "5.4900000000",
+       "gross": "5.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 115,
+    "name": "cx33",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0136000000",
+       "gross": "0.0136000000000000"
+      },
+      "price_monthly": {
+       "net": "8.4900000000",
+       "gross": "8.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0136000000",
+       "gross": "0.0136000000000000"
+      },
+      "price_monthly": {
+       "net": "8.4900000000",
+       "gross": "8.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0136000000",
+       "gross": "0.0136000000000000"
+      },
+      "price_monthly": {
+       "net": "8.4900000000",
+       "gross": "8.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 116,
+    "name": "cx43",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0256000000",
+       "gross": "0.0256000000000000"
+      },
+      "price_monthly": {
+       "net": "15.9900000000",
+       "gross": "15.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0256000000",
+       "gross": "0.0256000000000000"
+      },
+      "price_monthly": {
+       "net": "15.9900000000",
+       "gross": "15.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0256000000",
+       "gross": "0.0256000000000000"
+      },
+      "price_monthly": {
+       "net": "15.9900000000",
+       "gross": "15.9900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   },
+   {
+    "id": 117,
+    "name": "cx53",
+    "prices": [
+     {
+      "location": "fsn1",
+      "price_hourly": {
+       "net": "0.0473000000",
+       "gross": "0.0473000000000000"
+      },
+      "price_monthly": {
+       "net": "29.4900000000",
+       "gross": "29.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "hel1",
+      "price_hourly": {
+       "net": "0.0473000000",
+       "gross": "0.0473000000000000"
+      },
+      "price_monthly": {
+       "net": "29.4900000000",
+       "gross": "29.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     },
+     {
+      "location": "nbg1",
+      "price_hourly": {
+       "net": "0.0473000000",
+       "gross": "0.0473000000000000"
+      },
+      "price_monthly": {
+       "net": "29.4900000000",
+       "gross": "29.4900000000000000"
+      },
+      "included_traffic": 21990232555520,
+      "price_per_tb_traffic": {
+       "net": "1.0000000000",
+       "gross": "1.0000000000000000"
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,19 @@
+# Secrets locaux
+.env
+*.env
+
+# Sorties du provisionnement (clés, identifiants, état, journaux, cloud-config)
+final/
+
+# Environnement Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Éditeurs
+.vscode/
+.idea/
