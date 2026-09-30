@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from ..constants import (
-    EVAL_LABELS, L_FORCED, L_LOC, L_OP_IMAGE, L_SRC_SERVER, L_TYPE, OP_CHECKPOINT, OP_DISCARDING, OP_SAVING,
+    CARRIED_LABELS, L_FORCED, L_LOC, L_OP_IMAGE, L_SRC_SERVER, L_TYPE, OP_CHECKPOINT, OP_DISCARDING, OP_SAVING,
 )
 from ..hetzner.errors import UserError
 from ..hetzner.waiting import wait_actions
@@ -17,7 +17,7 @@ from ..models import ServerInfo
 from .base import OpContext, Operation
 from .common import (
     apply_retention, cleanup_after_delete, clear_op, delete_server_with_retry, mark_op, record_session,
-    session_summary, stop_windows, wait_snapshot_ready,
+    session_summary, stop_system, wait_snapshot_ready,
 )
 
 
@@ -43,28 +43,29 @@ class SaveOp(Operation):
         if srv is None:
             raise UserError("Serveur introuvable (déjà supprimé ?)")
         mark_op(self, srv.id, OP_SAVING if self.close else OP_CHECKPOINT)
-        self.forced = self.stop_windows(srv)
+        self.forced = self.stop_system(srv)
         self.image_id = self.snapshot(srv)
         if self.close:
             self.finish_close(srv)
         else:
-            self.set_phase("Redémarrage de Windows…")
+            self.set_phase("Redémarrage du bureau…")
             wait_actions(self.ctx.backend, [self.ctx.backend.server_action(srv.id, "poweron")], self,
                          timeout_s=300)
             clear_op(self, srv.id)
-            self.success_message = f"« {self.name} » sauvegardé — Windows redémarre"
+            self.success_message = f"« {self.name} » sauvegardé — le bureau redémarre"
         apply_retention(self, self.image_id, self.forced)
 
     # --- étapes ----------------------------------------------------------------------------
-    def stop_windows(self, srv: ServerInfo) -> bool:
-        return stop_windows(self, srv, quit_mode=self.quit_mode)
+    def stop_system(self, srv: ServerInfo) -> bool:
+        return stop_system(self, srv, quit_mode=self.quit_mode)
 
     def snapshot(self, srv: ServerInfo) -> int:
         backend = self.ctx.backend
         self.set_phase("Snapshot : démarrage…", 0)
         labels = desktop_labels(self.slug, **{L_SRC_SERVER: srv.id, L_TYPE: srv.server_type,
                                               L_LOC: srv.location, L_FORCED: int(self.forced)})
-        labels.update({k: v for k, v in srv.labels.items() if k in EVAL_LABELS})   # licence d'évaluation
+        # système du bureau, licence d'évaluation…
+        labels.update({k: v for k, v in srv.labels.items() if k in CARRIED_LABELS})
         image_id, action_id = backend.create_snapshot(
             srv.id, format_description(self.name, datetime.now(timezone.utc)), labels)
         backend.update_server_labels(srv.id, {L_OP_IMAGE: image_id})

@@ -48,14 +48,14 @@ def delete_server_with_retry(op: Operation, server_id: int, attempts: int = 3) -
                     f"Réessaie la suppression. Détail : {last}", code="delete_failed", retryable=True)
 
 
-def stop_windows(op: Operation, srv: ServerInfo, *, quit_mode: bool = False,
+def stop_system(op: Operation, srv: ServerInfo, *, quit_mode: bool = False,
                  force_on_timeout: bool = False, timeout_s: float | None = None) -> bool:
-    """Arrêt propre (ACPI), puis décision de l'utilisateur si Windows traîne (ou arrêt forcé d'office
-    avec `force_on_timeout`, pour un Windows neuf qui n'a rien à perdre). Vrai si forcé."""
+    """Arrêt propre (ACPI), puis décision de l'utilisateur si le système traîne (ou arrêt forcé d'office
+    avec `force_on_timeout`, pour une installation neuve qui n'a rien à perdre). Vrai si forcé."""
     backend = op.ctx.backend
     if srv.status == "off":
         return False
-    op.set_phase("Arrêt de Windows…", cancellable=True)
+    op.set_phase("Arrêt du système…", cancellable=True)
     if srv.status != "stopping":
         try:
             wait_actions(backend, [backend.server_action(srv.id, "shutdown")], op, timeout_s=120)
@@ -68,20 +68,20 @@ def stop_windows(op: Operation, srv: ServerInfo, *, quit_mode: bool = False,
             wait_server_status(
                 backend, srv.id, {"off"}, op, timeout_s=timeout, interval=5,
                 on_tick=lambda _e: op.set_phase(
-                    f"Arrêt de Windows… {fmt.clock(time.monotonic() - start)}", cancellable=True))
-            op.log("Windows est arrêté")
+                    f"Arrêt du système… {fmt.clock(time.monotonic() - start)}", cancellable=True))
+            op.log("Système arrêté")
             return False
         except WaitTimeout:
             pass
         if force_on_timeout:
-            op.log("Windows ne répond pas au signal d'arrêt : arrêt forcé (installation neuve, rien à perdre)",
+            op.log("Le système ne répond pas au signal d'arrêt : arrêt forcé (installation neuve, rien à perdre)",
                    "warning")
             choice = "force"
         else:
             choice = op.ask(
-                "Windows ne s'arrête pas",
+                "Le système ne s'arrête pas",
                 f"« {op.name} » n'a pas fini de s'arrêter après {fmt.duration(time.monotonic() - start)} "
-                "(mises à jour Windows en cours ?).\n\nForcer l'arrêt revient à débrancher la prise : "
+                "(mises à jour en cours ?).\n\nForcer l'arrêt revient à débrancher la prise : "
                 "les fichiers non enregistrés peuvent être perdus.",
                 [("wait", "Attendre 5 min de plus", "default"), ("force", "Forcer l'arrêt", "danger"),
                  ("cancel", "Annuler (laisser allumé)", "default")],
@@ -96,13 +96,14 @@ def stop_windows(op: Operation, srv: ServerInfo, *, quit_mode: bool = False,
             op.log("Arrêt forcé effectué", "warning")
             return True
         timeout = 300.0
-        op.set_phase("Arrêt de Windows…", cancellable=True)
+        op.set_phase("Arrêt du système…", cancellable=True)
 
 
 def cleanup_after_delete(op: Operation, server: ServerInfo, fixed_ip_id: int | None) -> None:
     """Oublie l'identifiant TERMSRV d'une IP dynamique : Hetzner peut la redonner à un inconnu."""
     if server.ipv4 and server.ipv4_id != fixed_ip_id:
         rdp.delete_termsrv_cred(server.ipv4)
+        rdp.forget_certificate(server.ipv4)
         op.ctx.config.remove_cred(server.ipv4)
         if op.slug:
             rdp.delete_rdp_file(op.slug)
@@ -177,3 +178,6 @@ def wait_snapshot_ready(op: Operation, image_id: int, action_id: int | None) -> 
         op.set_phase("Vérification du snapshot…" if action_id else "Snapshot en cours…",
                      100 if action_id else None)
         op.sleep(5)
+
+
+stop_windows = stop_system   # ancien nom

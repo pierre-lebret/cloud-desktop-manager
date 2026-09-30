@@ -29,6 +29,8 @@ SYSTEM_IMAGES = {
     "ubuntu-24.04": {"id": 161547269, "name": "ubuntu-24.04", "os_flavor": "ubuntu"},
     "ubuntu-22.04": {"id": 67794396, "name": "ubuntu-22.04", "os_flavor": "ubuntu"},
     "debian-12": {"id": 114690387, "name": "debian-12", "os_flavor": "debian"},
+    "ubuntu-26.04": {"id": 288447615, "name": "ubuntu-26.04", "os_flavor": "ubuntu"},
+    "debian-13": {"id": 247051392, "name": "debian-13", "os_flavor": "debian"},
 }
 BUILD_BOOT_S = 20          # secondes simulées avant que SSH réponde après un (re)démarrage
 BUILD_WINDOWS_S = 300      # durée simulée de l'installation Windows avant que RDP réponde
@@ -438,7 +440,7 @@ class FakeCloud:
         vid = next(self._ids)
         vol = {"id": vid, "name": body["name"], "size": int(body["size"]), "server": srv["id"] if srv else None,
                "labels": body.get("labels") or {}, "created": _iso(_now()), "status": "available",
-               "location": copy.deepcopy(self.locations[location]), "format": None,
+               "location": copy.deepcopy(self.locations[location]), "format": body.get("format"),
                "linux_device": f"/dev/disk/by-id/scsi-0HC_Volume_{vid}", "protection": {"delete": False}}
         self.volumes[vid] = vol
         if srv:
@@ -614,6 +616,19 @@ BUILD_TIMELINE: list[tuple[int, list[str]]] = [
 ]
 _STEP_IMAGES, _STEP_INSTALL_WIM = 4, 10
 
+# Installation d'un bureau Linux (secondes simulées après linux-prepare, jalons du journal).
+LINUX_TIMELINE: list[tuple[int, str]] = [
+    (5, "RDPM-STEP 1/6 Mise à jour du système"),
+    (40, "RDPM-STEP 2/6 Bureau XFCE, son et Firefox"),
+    (100, "RDPM-STEP 3/6 Langue, clavier et fuseau horaire"),
+    (110, "RDPM-STEP 4/6 Compilation d'xrdp avec H.264 (quelques minutes)"),
+    (230, "RDPM-STEP 5/6 Configuration du bureau distant"),
+    (240, "RDPM-STEP 6/6 Vérifications"),
+    (245, "RDPM-DONE"),
+]
+LINUX_STAGES = ("linux-installing", "linux-done")
+FAKE_CERT = "3A1F9C0D5E7B2468ACE013579BDF2468ACE01357"
+
 
 class FakeRemote:
     """Machine à états d'un serveur de construction : ubuntu → prepared → rebooting → alpine → hold →
@@ -655,8 +670,9 @@ class FakeRemote:
                     or self.cloud.sim() - b["boot"] < BUILD_BOOT_S):
                 return RemoteResult(255, "", f"ssh: connect to host {host}: Connection refused")
             # Ubuntu : root ; Alpine (reinstall.sh) : la clé est posée sur l'utilisateur « administrator ».
-            expected = "root" if b["stage"] in ("ubuntu", "prepared") else "administrator"
-            if user != expected:
+            # Bureau Linux : root, jusqu'à la finalisation qui retire la clé temporaire.
+            expected = "root" if b["stage"] in ("ubuntu", "prepared", *LINUX_STAGES) else "administrator"
+            if user != expected or b["stage"] == "linux-finalized":
                 return RemoteResult(255, "", f"{user}@{host}: Permission denied (publickey).")
             self.calls.append((tag, srv["id"]))
             handler = getattr(self, f"_do_{tag.replace('-', '_')}", None)
@@ -734,6 +750,57 @@ class FakeRemote:
             sid, nxt = srv["id"], b["next"]
             self.cloud._at(2, lambda: self._step(sid, nxt))
         return RemoteResult(0, "RDPM_IMAGE_SET\n", "")
+
+    # --- bureau Linux --------------------------------------------------------------------------
+    def _do_linux_prepare(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        if b["stage"] in LINUX_STAGES:   # rejoué après une coupure : l'installation continue
+            return RemoteResult(0, "RDPM_STARTED\n", "")
+        if b["stage"] != "ubuntu":
+            return RemoteResult(1, "", "état inattendu")
+        if "build_prepare" in self.cloud.fail:
+            return RemoteResult(1, "", "useradd: group 'sudo' does not exist")
+        user = re.search(r"^USERNAME='([^']*)'", script, re.M)
+        pw = re.search(r"""printf '%s:%s\\n' "\$USERNAME" '([^']*)' \| chpasswd""", script)
+        b.update(stage="linux-installing", username=user.group(1) if user else None,
+                 password=pw.group(1) if pw else None, marks=[], unit="active", result="success",
+                 install_script=script)
+        sid = srv["id"]
+        for delay, mark in LINUX_TIMELINE:
+            self.cloud._at(delay, lambda m=mark: self._linux_mark(sid, m))
+        return RemoteResult(0, "RDPM_STARTED\n", "")
+
+    def _linux_mark(self, sid: int, mark: str) -> None:
+        b = self.cloud.builds.get(sid)
+        if b is None or b["stage"] != "linux-installing" or b["unit"] != "active":
+            return
+        if mark.startswith("RDPM-STEP 4/") and "linux_install_error" in self.cloud.fail:
+            b["marks"] += [mark, "RDPM-FAILED Compilation d'xrdp avec H.264 (code 2, ligne 203)"]
+            b["tail"] = "configure: error: x264 library not found (simulé)"
+            b["unit"], b["result"] = "failed", "exit-code"
+            return
+        if mark.startswith("RDPM-STEP 3/") and "linux_unit_killed" in self.cloud.fail:
+            b["marks"].append(mark)
+            b["unit"], b["result"] = "inactive", "oom-kill"
+            return
+        b["marks"].append(mark)
+        if mark == "RDPM-DONE":
+            b["stage"], b["unit"] = "linux-done", "inactive"
+
+    def _do_linux_status(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        if b["stage"] not in LINUX_STAGES:
+            return RemoteResult(1, "", "pas d'installation en cours")
+        marks = "\n".join(b["marks"])
+        tail = b.get("tail") or (b["marks"][-1] if b["marks"] else "")
+        return RemoteResult(0, f"RDPM_UNIT {b['unit']} {b['result']}\nRDPM_MARKS_BEGIN\n{marks}\n"
+                               f"RDPM_TAIL_BEGIN\n{tail}\n", "")
+
+    def _do_linux_finalize(self, srv: dict, b: dict, script: str) -> RemoteResult:
+        if b["stage"] != "linux-done":
+            return RemoteResult(1, "", "installation non terminée")
+        b["stage"], b["finalize_script"] = "linux-finalized", script
+        self.cloud.boot_at[srv["id"]] = float("inf") if "linux_rdp_never" in self.cloud.fail \
+            else self.cloud.sim() - BOOT_TO_RDP_S
+        return RemoteResult(0, f"RDPM_SESSION 1\nRDPM_CERT {FAKE_CERT}\nRDPM_XRDP 0.10.6.1\nRDPM_FINALIZED\n", "")
 
     def _do_alpine_hook(self, srv: dict, b: dict, script: str) -> RemoteResult:
         if b["stage"] != "hold":

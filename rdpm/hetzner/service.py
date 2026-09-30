@@ -234,11 +234,12 @@ class HetznerService:
 
     # --- volumes ---------------------------------------------------------------------------
     def create_volume(self, size: int, name: str, labels: dict[str, str],
-                      server_id: int) -> tuple[VolumeInfo, list[int]]:
-        # server= OU location= (jamais les deux) ; format/automount sont réservés à Linux.
-        resp = self._write("POST", "/volumes", f"créer le volume {name}",
-                           {"size": size, "name": name, "labels": labels, "server": server_id,
-                            "automount": False})
+                      server_id: int, fs_format: str | None = None) -> tuple[VolumeInfo, list[int]]:
+        # server= OU location= (jamais les deux) ; format (ext4, xfs) : bureau Linux uniquement.
+        body = {"size": size, "name": name, "labels": labels, "server": server_id, "automount": False}
+        if fs_format:
+            body["format"] = fs_format
+        resp = self._write("POST", "/volumes", f"créer le volume {name}", body)
         return VolumeInfo.from_api(resp["volume"]), _action_ids(resp)
 
     def attach_volume(self, volume_id: int, server_id: int) -> int:

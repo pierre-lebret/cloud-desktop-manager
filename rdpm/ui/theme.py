@@ -15,6 +15,7 @@ FAINT = ("#8A91A0", "#626A7A")
 
 ACCENT = ("#3B5BDB", "#5C7CFA")
 ACCENT_HOVER = ("#3049B8", "#4C6EF5")
+ACCENT_DISABLED = ("#AAB6E6", "#2E3A66")   # bouton principal grisé
 
 TONES = {
     #          texte fort           fond doux
@@ -28,6 +29,7 @@ TONES = {
 
 DANGER = ("#E03131", "#FA5252")
 DANGER_HOVER = ("#C92A2A", "#F03E3E")
+DANGER_DISABLED = ("#EDB3B3", "#5C2A2A")
 
 PAD = 16
 CARD_WIDTH = 400

@@ -57,10 +57,19 @@ class Pill(ctk.CTkLabel):
         self.configure(text=f"●  {text}", fg_color=soft, text_color=strong)
 
 
+def _filled(button: ctk.CTkButton, enabled, disabled) -> ctk.CTkButton:
+    """Bouton plein : fond atténué quand il est désactivé (voir ctk_patches)."""
+    button._rdpm_colors = (enabled, disabled)
+    if button.cget("state") == "disabled":
+        button.configure(fg_color=disabled)
+    return button
+
+
 def primary_button(master, text: str, command: Callable, width: int = 0, **kw) -> ctk.CTkButton:
-    return ctk.CTkButton(master, text=text, command=command, fg_color=t.ACCENT, hover_color=t.ACCENT_HOVER,
-                         text_color="#FFFFFF", text_color_disabled=("#C9D3F5", "#8C9BD6"), font=t.font(13, "bold"),
-                         height=34, corner_radius=8, width=width or 120, **kw)
+    return _filled(ctk.CTkButton(master, text=text, command=command, fg_color=t.ACCENT, hover_color=t.ACCENT_HOVER,
+                                 text_color="#FFFFFF", text_color_disabled=("#F4F6FC", "#9AA6D6"),
+                                 font=t.font(13, "bold"), height=34, corner_radius=8, width=width or 120, **kw),
+                   t.ACCENT, t.ACCENT_DISABLED)
 
 
 def secondary_button(master, text: str, command: Callable, width: int = 0, **kw) -> ctk.CTkButton:
@@ -71,10 +80,10 @@ def secondary_button(master, text: str, command: Callable, width: int = 0, **kw)
 
 
 def danger_button(master, text: str, command: Callable, width: int = 0, **kw) -> ctk.CTkButton:
-    return ctk.CTkButton(master, text=text, command=command, fg_color=t.DANGER, hover_color=t.DANGER_HOVER,
-                         text_color="#FFFFFF", text_color_disabled=("#F5C2C2", "#9E5A5A"), font=t.font(13, "bold"),
-                         height=34, corner_radius=8,
-                         width=width or 120, **kw)
+    return _filled(ctk.CTkButton(master, text=text, command=command, fg_color=t.DANGER, hover_color=t.DANGER_HOVER,
+                                 text_color="#FFFFFF", text_color_disabled=("#FDF2F2", "#C98A8A"),
+                                 font=t.font(13, "bold"), height=34, corner_radius=8, width=width or 120, **kw),
+                   t.DANGER, t.DANGER_DISABLED)
 
 
 def danger_outline_button(master, text: str, command: Callable, width: int = 0, **kw) -> ctk.CTkButton:

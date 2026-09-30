@@ -6,7 +6,7 @@ devient un serveur facturé à l'heure que pendant que tu t'en sers.
 | | Aujourd'hui | Prévu |
 |---|---|---|
 | Fournisseurs cloud | Hetzner Cloud | d'autres fournisseurs |
-| Systèmes | Windows (RDP) | Linux (visible dans *+ Nouveau bureau*, grisé « Bientôt ») |
+| Systèmes | Windows et Linux (Ubuntu 26.04 LTS, Debian 13 — bureau XFCE), connexion RDP en 1 clic | |
 
 Exemple chez Hetzner : 30 h par mois sur un cpx32 reviennent à environ 1,70 € de calcul et 0,18 € de stockage, au lieu
 d'environ 35 € pour un serveur allumé en permanence.
@@ -50,7 +50,8 @@ projet. L'application affiche **tous les projets ensemble** : cartes, coûts add
 
 Pannes injectables : `snapshot`, `shutdown_timeout`, `resource_unavailable`, `delete`, `probe`, `change_type`, et pour
 la création d'un Windows de référence : `build_iso_missing`, `build_ssh_timeout`, `build_prepare`, `build_image_name`,
-`build_install_error`, `build_rdp_never`.
+`build_install_error`, `build_rdp_never` ; pour un bureau Linux : `build_prepare`, `build_ssh_timeout`,
+`linux_install_error`, `linux_unit_killed`, `linux_rdp_never`.
 
 ## Premier démarrage
 
@@ -104,6 +105,36 @@ charge) — 36 min au total pour un Windows Server 2025 de 5,3 Go.
   le conserver pour diagnostic (journal de l'installeur sur `http://<ip>/`, RDP avec le compte administrateur). Un
   serveur oublié apparaît dans *Dormants* comme serveur temporaire.
 - Le client OpenSSH de Windows (`ssh.exe`, présent par défaut sur Windows 10/11) est requis sur ce poste.
+
+## Créer un bureau Linux
+
+*+ Nouveau bureau → Linux → Créer un bureau Linux…* : nom, distribution (**Ubuntu 26.04 LTS** ou **Debian 13**),
+identifiant du compte, langue, fuseau horaire, emplacement et type. Tout est automatique (environ 10 à 20 minutes,
+plus le snapshot) ; la carte affiche l'étape en cours (« Installation 4/6 : compilation d'xrdp… »).
+
+**Pourquoi ce choix** : un bureau distant sur un serveur sans carte graphique doit éviter tout rendu OpenGL
+logiciel (c'est ce qui rend Cinnamon ou GNOME saccadés à distance) et envoyer une image compressée efficacement.
+
+- **Bureau XFCE**, compositeur désactivé : léger, net, réactif ; thème Greybird, icônes elementary, polices Noto.
+- **xrdp 0.10.6.1 compilé avec x264** : l'image est envoyée en **H.264** (RDP GFX), bien plus fluide pour la vidéo
+  et le défilement que les versions des dépôts (Ubuntu 26.04 n'a que xrdp 0.10.1, sans H.264). Sources officielles
+  (neutrinolabs) figées et vérifiées par SHA-256 : xrdp, xorgxrdp 0.10.5, pipewire-module-xrdp (son).
+- **Connexion identique à Windows** : mstsc, 1 clic, mot de passe enregistré, **ouverture de session automatique**,
+  pas d'alerte de certificat (son empreinte est préenregistrée), **son**, presse-papiers, fenêtre redimensionnable ;
+  on retrouve sa session là où on l'a laissée. Le clavier suit celui du PC.
+- **Firefox** : dépôt APT officiel de Mozilla sur Ubuntu (pas de snap), Firefox ESR sur Debian.
+- **Sauvegarder & fermer** fonctionne comme pour Windows : le bouton d'arrêt ACPI éteint toujours le système.
+- **Sécurité** : RDP en TLS uniquement, compte root refusé en RDP, SSH sans mot de passe (et port 22 fermé par les
+  listes d'accès), clé SSH temporaire retirée avant le snapshot, mises à jour de sécurité automatiques.
+- **Volumes** : créés déjà formatés (ext4), visibles dans le gestionnaire de fichiers ; l'aide affichée donne la
+  ligne `/etc/fstab` pour les monter automatiquement.
+- **Conseils** : 4 vCPU ou plus pour la vidéo (l'encodage H.264 se fait sur le serveur). Après un lancement, les
+  mises à jour automatiques peuvent occuper le système quelques minutes.
+- **Mettre xrdp à jour** : depuis un terminal du bureau, modifier version et SHA-256 en tête de
+  `/usr/local/share/rdpm/build-xrdp.sh`, puis `sudo bash /usr/local/share/rdpm/build-xrdp.sh`.
+- **En cas d'échec** : fin du journal affichée ; serveur conservable pour diagnostic
+  (`/var/log/rdpm-install.log`, `journalctl -u rdpm-install`).
+- **Importer** un snapshot ou serveur Linux existant : onglet Linux de *+ Nouveau bureau* (xrdp doit y être installé).
 
 ## Utilisation au quotidien
 
@@ -172,7 +203,7 @@ python -m pytest tests
 | `rdpm/providers.py` | fournisseurs connus de l'interface (nom, logo, aide pour la clé API) |
 | `rdpm/hetzner/` | API Hetzner (`service.py`), attentes robustes, erreurs traduites, `fake.py` (API émulée) |
 | `rdpm/ops/` | opérations longues (lancer, sauvegarder, dupliquer, construire…) exécutées hors du thread Tk |
-| `rdpm/build/`, `rdpm/remote.py` | création d'un Windows de référence : catalogue, scripts distants, lecture du journal, SSH |
+| `rdpm/build/`, `rdpm/remote.py` | création d'un bureau de référence : catalogues Windows et Linux (`linux.py`), scripts distants (`scripts.py`, `linux_scripts.py`), lecture du journal, SSH |
 | `rdpm/state.py`, `offers.py`, `retention.py`, `pricing.py` | logique pure et testée |
 | `rdpm/controller.py` | état de l'application, rafraîchissements, sondes RDP, fermeture |
 | `rdpm/ui/` | interface customtkinter |

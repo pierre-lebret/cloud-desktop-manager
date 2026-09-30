@@ -20,7 +20,7 @@ from typing import Callable
 from . import fmt, license, netutil, rdp
 from .config import AppConfig, SessionLog
 from .constants import (
-    MAX_FIREWALL_SOURCES, OS_LINUX, L_LOC, L_OP_TS, L_TYPE, OP_BUILDING, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING,
+    MAX_FIREWALL_SOURCES, OS_LINUX, OS_WINDOWS, L_CERT, L_LOC, L_OP_TS, L_TYPE, OP_BUILDING, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING,
     PROBE_BOOTING_S, PROBE_READY_S, PUBLIC_IP_REFRESH_S, REFRESH_BUSY_S, REFRESH_IDLE_S, STATIC_CACHE_PATH,
 )
 from .events import (
@@ -33,7 +33,8 @@ from .models import Desktop, FirewallInfo, Inventory, PrimaryIpInfo, ServerInfo,
 from .offers import best_by_location
 from .projects import ProjectSpec
 from .ops.base import OpContext, Operation
-from .ops.build import BuildOp, BuildParams
+from .ops.build import BaseBuildOp, BuildOp, BuildParams
+from .ops.build_linux import LinuxBuildOp, LinuxBuildParams
 from .ops.duplicate import DuplicateOp
 from .ops.launch import LaunchOp, LaunchParams
 from .ops.resources import (
@@ -412,6 +413,7 @@ class AppController:
         for ip in list(self.config.managed_creds):
             if ip not in ours:
                 rdp.delete_termsrv_cred(ip)
+                rdp.forget_certificate(ip)
                 self.config.remove_cred(ip)
                 self._log("info", f"Identifiant RDP périmé supprimé ({ip})")
 
@@ -483,7 +485,7 @@ class AppController:
             srv = d.server
             view = DesktopView(slug=d.slug, name=d.name, state=state, state_label=label, color=color,
                                spec=self._spec(d), error=self.errors.get(d.slug), key=self.key(d.slug),
-                               project=self.project.name, os=d.os)
+                               project=self.project.name, os=getattr(op, "os_name", None) or d.os)
             if srv:
                 view.ip = srv.ipv4
                 if self.static:
@@ -532,7 +534,7 @@ class AppController:
         if d.server:
             return f"{d.server.spec} · disque {d.server.disk} Go"
         op = self.runner.for_slug(d.slug)
-        if isinstance(op, BuildOp):
+        if isinstance(op, BaseBuildOp):
             return f"Installation : {op.describe}"
         prefs = self.config.desktops.get(d.slug)
         latest = d.latest or (d.snapshots[0] if d.snapshots else None)
@@ -549,7 +551,7 @@ class AppController:
             pending = d.pending_snapshot
             if pending:
                 return "Première sauvegarde en cours…"
-            if isinstance(self.runner.for_slug(d.slug), BuildOp):
+            if isinstance(self.runner.for_slug(d.slug), BaseBuildOp):
                 return "Le snapshot de référence sera créé à la fin de l'installation"
             return "Aucune sauvegarde : fermer sans sauvegarder supprimera tout"
         n = sum(1 for s in d.snapshots if s.available)
@@ -766,7 +768,7 @@ class AppController:
                                      "Reste d'un bureau supprimé (gratuit)", 0.0, fw))
         for srv in g.tmp_servers:
             if not self.runner.active():
-                what = "installation Windows" if srv.op == OP_BUILDING else "duplication"
+                what = "installation" if srv.op == OP_BUILDING else "duplication"
                 items.append(DormantItem(f"srv:{srv.id}", "server", f"Serveur temporaire « {srv.name} »",
                                          f"Reste d'une {what} interrompue · {fmt.eur_h(srv.price_hourly)}",
                                          srv.price_monthly, srv))
@@ -835,16 +837,19 @@ class AppController:
             return self._submit(LaunchOp(self.ctx, new_slug, new_name, params))
         return self._submit(DuplicateOp(self.ctx, slug, snapshot, new_slug, new_name))
 
-    def build_windows(self, name: str, params: BuildParams) -> Operation:
-        """Crée un bureau à partir de rien : installation Windows sans surveillance puis snapshot."""
+    def build_desktop(self, name: str, params: BuildParams | LinuxBuildParams) -> Operation:
+        """Crée un bureau à partir de rien (Windows ou Linux) : installation automatique puis snapshot."""
         if self.mode == "readonly":
             raise UserError("Mode lecture seule : impossible de créer un serveur")
         slug = unique_slug(slugify(name), self.known_slugs())
-        return self._submit(BuildOp(self.ctx, slug, name, params))
+        op_class = LinuxBuildOp if isinstance(params, LinuxBuildParams) else BuildOp
+        return self._submit(op_class(self.ctx, slug, name, params))
+
+    build_windows = build_desktop
 
     def add_volume(self, slug: str, size: int, volume_name: str) -> Operation:
         d = self._require(slug)
-        return self._submit(AddVolumeOp(self.ctx, slug, d.name, d.server.id, size, volume_name))
+        return self._submit(AddVolumeOp(self.ctx, slug, d.name, d.server.id, size, volume_name, d.os))
 
     def volume_action(self, slug: str | None, volume: VolumeInfo, action: str, size: int | None = None) -> Operation:
         d = self.desktop(slug) if slug else None
@@ -911,15 +916,16 @@ class AppController:
         return self._submit(FixedIpOp(self.ctx, slug, d.name, mode, location, ip))
 
     def adopt_snapshot(self, snapshot: SnapshotInfo, name: str, rdp_user: str, password: str | None,
-                       pin: bool) -> Operation:
+                       pin: bool, os_name: str = OS_WINDOWS) -> Operation:
         slug = unique_slug(slugify(name), self.known_slugs())
         self._store_identity(slug, name, rdp_user, password)
-        return self._submit(AdoptSnapshotOp(self.ctx, slug, name, snapshot, pin))
+        return self._submit(AdoptSnapshotOp(self.ctx, slug, name, snapshot, pin, os_name))
 
-    def adopt_server(self, server: ServerInfo, name: str, rdp_user: str, password: str | None) -> Operation:
+    def adopt_server(self, server: ServerInfo, name: str, rdp_user: str, password: str | None,
+                     os_name: str = OS_WINDOWS) -> Operation:
         slug = unique_slug(slugify(name), self.known_slugs())
         self._store_identity(slug, name, rdp_user, password)
-        return self._submit(AdoptServerOp(self.ctx, slug, name, server))
+        return self._submit(AdoptServerOp(self.ctx, slug, name, server, os_name))
 
     def _store_identity(self, slug: str, name: str, rdp_user: str, password: str | None) -> None:
         self.config.update_prefs(slug, display_name=name, rdp_user=rdp_user or "Administrator")
@@ -974,7 +980,9 @@ class AppController:
         password = self.creds.get_password(slug)
         if password and rdp.write_termsrv_cred(srv.ipv4, user, password):
             self.config.add_cred(srv.ipv4, slug)
-        rdp.launch_mstsc(rdp.write_rdp_file(slug, srv.ipv4, user))
+        if rdp.trust_certificate(srv.ipv4, srv.labels.get(L_CERT), user):
+            self.config.add_cred(srv.ipv4, slug)
+        rdp.launch_mstsc(rdp.write_rdp_file(slug, srv.ipv4, user, d.os))
         self._log("info", f"Connexion RDP à {srv.ipv4} ({user})", slug)
         if not password and self.ui:
             self.ui.toast("Astuce : enregistre le mot de passe (Identifiants RDP…) pour la connexion en 1 clic.", "info")

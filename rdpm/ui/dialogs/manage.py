@@ -8,7 +8,7 @@ from typing import Callable
 import customtkinter as ctk
 
 from ... import fmt, netutil
-from ...constants import VOLUME_MAX_GB, VOLUME_MIN_GB
+from ...constants import OS_LINUX, OS_WINDOWS, VOLUME_MAX_GB, VOLUME_MIN_GB
 from ...hetzner.errors import UserError
 from ...labels import slugify
 from ...models import Desktop
@@ -735,7 +735,18 @@ class ConflictDialog(LiveModal):
             self.run(self.ctrl.cleanup, DormantItem(f"srv:{srv.id}", "server", srv.name, "", 0.0, srv))
 
 
-def volume_help(app) -> None:
+def volume_help(app, os_name: str = OS_WINDOWS, volume_id: int | None = None) -> None:
+    if os_name == OS_LINUX:
+        dev = f"/dev/disk/by-id/scsi-0HC_Volume_{volume_id or '<id>'}"
+        info(app, "Utiliser le volume dans Linux", [
+            "Le volume est attaché et déjà formaté (ext4).",
+            "Pour l'utiliser tout de suite : dans le gestionnaire de fichiers (Thunar), clique sur le volume dans "
+            "le panneau de gauche, il est monté sans mot de passe.",
+            "Pour le retrouver automatiquement à chaque lancement dans /mnt/volume, une fois dans un terminal :",
+        ], code="sudo mkdir -p /mnt/volume\n"
+                f"echo '{dev} /mnt/volume ext4 discard,nofail,defaults 0 0' | sudo tee -a /etc/fstab\n"
+                "sudo mount -a && sudo chown \"$USER:\" /mnt/volume")
+        return
     info(app, "Initialiser le volume dans Windows", [
         "Le volume est attaché. Windows le voit comme un nouveau disque vierge :",
         "1. Clic droit sur Démarrer → Gestion des disques.",
@@ -746,7 +757,12 @@ def volume_help(app) -> None:
             "  New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem NTFS -Confirm:$false")
 
 
-def resize_help(app) -> None:
+def resize_help(app, os_name: str = OS_WINDOWS, volume_id: int | None = None) -> None:
+    if os_name == OS_LINUX:
+        info(app, "Étendre le volume dans Linux", [
+            "Le disque est plus grand ; le système de fichiers s'agrandit à chaud (volume monté ou non) :",
+        ], code=f"sudo resize2fs /dev/disk/by-id/scsi-0HC_Volume_{volume_id or '<id>'}")
+        return
     info(app, "Étendre le volume dans Windows", [
         "Le disque est plus grand, mais Windows n'utilise pas encore l'espace ajouté :",
         "Gestion des disques → clic droit sur le volume → Étendre le volume. Ou en PowerShell :",
