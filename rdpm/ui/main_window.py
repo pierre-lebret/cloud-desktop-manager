@@ -627,10 +627,12 @@ class MainWindow(ctk.CTk):
                     ("Ignorer", lambda: ctrl.snooze_reminder(sid, None))], sticky=True)
 
     def on_followup(self, scope: ProjectScope, op) -> None:
+        d = scope.controller.desktop(op.slug) if op.slug else None
+        os_name = op.result.get("os") or (d.os if d else "windows")
         if op.followup == "volume_help":
-            volume_help(self)
+            volume_help(self, os_name, op.result.get("volume_id"))
         elif op.followup == "resize_help":
-            resize_help(self)
+            resize_help(self, os_name, op.result.get("volume_id"))
         elif op.followup == "build_done":
             BuildDoneDialog(scope, op)
 

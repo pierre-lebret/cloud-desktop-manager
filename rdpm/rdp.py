@@ -19,7 +19,7 @@ from pathlib import Path
 import keyring
 from keyring.errors import KeyringError, PasswordDeleteError
 
-from .constants import KEYRING_SERVICE, KEYRING_TOKEN_USER, RDP_DIR
+from .constants import KEYRING_SERVICE, KEYRING_TOKEN_USER, OS_LINUX, OS_WINDOWS, RDP_DIR
 
 log = logging.getLogger(__name__)
 
@@ -167,13 +167,16 @@ def delete_termsrv_cred(host: str) -> bool:
         return result.returncode == 0
 
 
-def build_rdp_file(host: str, user: str) -> str:
+def build_rdp_file(host: str, user: str, os_name: str = OS_WINDOWS) -> str:
+    linux = os_name == OS_LINUX
     lines = [
         f"full address:s:{host}",
         f"username:s:{user}",
         "prompt for credentials:i:0",
         "authentication level:i:2",
-        "enablecredsspsupport:i:1",
+        # xrdp n'a pas d'authentification NLA : sans CredSSP, mstsc transmet l'identifiant enregistré
+        # dans la connexion et xrdp ouvre la session directement.
+        f"enablecredsspsupport:i:{0 if linux else 1}",
         "screen mode id:i:2",
         "use multimon:i:0",
         "session bpp:i:32",
@@ -185,6 +188,8 @@ def build_rdp_file(host: str, user: str) -> str:
         "audiomode:i:0",
         "displayconnectionbar:i:1",
     ]
+    if linux:
+        lines.append("dynamic resolution:i:1")   # xrdp redimensionne la session avec la fenêtre
     return "\r\n".join(lines) + "\r\n"
 
 
@@ -192,11 +197,52 @@ def rdp_file_path(slug: str) -> Path:
     return RDP_DIR / f"{slug}.rdp"
 
 
-def write_rdp_file(slug: str, host: str, user: str) -> Path:
+def write_rdp_file(slug: str, host: str, user: str, os_name: str = OS_WINDOWS) -> Path:
     path = rdp_file_path(slug)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(build_rdp_file(host, user), encoding="utf-8")
+    path.write_text(build_rdp_file(host, user, os_name), encoding="utf-8")
     return path
+
+
+# --- certificat du serveur : comme « Ne plus me demander pour ce PC » dans mstsc ------------------------
+_SERVERS_KEY = r"Software\Microsoft\Terminal Server Client\Servers"
+
+
+def trust_certificate(host: str, sha1_hex: str | None, user: str | None = None) -> bool:
+    """Préenregistre l'empreinte du certificat RDP du bureau pour cette IP : pas d'alerte à la connexion.
+    L'empreinte vient du snapshot (label), relevée pendant la construction."""
+    try:
+        digest = bytes.fromhex(sha1_hex or "")
+    except ValueError:
+        return False
+    if len(digest) != 20:
+        return False
+    if SIMULATE:
+        log.info("[simulation] certificat RDP approuvé pour %s", host)
+        return True
+    if sys.platform != "win32":
+        return False
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, f"{_SERVERS_KEY}\\{host}") as key:
+            winreg.SetValueEx(key, "CertHash", 0, winreg.REG_BINARY, digest)
+            if user:
+                winreg.SetValueEx(key, "UsernameHint", 0, winreg.REG_SZ, user)
+        return True
+    except OSError as exc:
+        log.warning("Certificat RDP non préenregistré pour %s : %s", host, exc)
+        return False
+
+
+def forget_certificate(host: str) -> None:
+    """Oublie le certificat approuvé pour une IP qui n'est plus à nous (Hetzner peut la réattribuer)."""
+    if SIMULATE or sys.platform != "win32":
+        return
+    try:
+        import winreg
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, f"{_SERVERS_KEY}\\{host}")
+    except OSError:
+        pass
 
 
 def delete_rdp_file(slug: str) -> None:

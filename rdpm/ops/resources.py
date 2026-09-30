@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from .. import fmt, netutil
 from ..constants import (
-    DEFAULT_FIREWALL_NAME, L_EVAL_AUTO, L_MANAGED, L_ROLE, OP_LABELS, ROLE_DESKTOP, ROLE_DESKTOP_FIREWALL,
-    ROLE_RDP_FIREWALL,
+    DEFAULT_FIREWALL_NAME, L_EVAL_AUTO, L_MANAGED, L_OS, L_ROLE, OP_LABELS, OS_LINUX, OS_WINDOWS, ROLE_DESKTOP,
+    ROLE_DESKTOP_FIREWALL, ROLE_RDP_FIREWALL,
 )
 from ..hetzner.waiting import wait_actions
 from ..labels import desktop_labels, format_description, parse_description
@@ -17,16 +17,19 @@ from .common import delete_server_with_retry
 class AddVolumeOp(Operation):
     title = "Ajout d'un volume"
 
-    def __init__(self, ctx: OpContext, slug: str, name: str, server_id: int, size: int, volume_name: str):
+    def __init__(self, ctx: OpContext, slug: str, name: str, server_id: int, size: int, volume_name: str,
+                 os_name: str = OS_WINDOWS):
         super().__init__(ctx, slug, name)
-        self.server_id, self.size, self.volume_name = server_id, size, volume_name
+        self.server_id, self.size, self.volume_name, self.os_name = server_id, size, volume_name, os_name
 
     def execute(self) -> None:
         self.set_phase(f"Création du volume {self.volume_name} ({self.size} Go)…")
+        # Bureau Linux : le fournisseur formate le volume (ext4) ; il suffit de le monter dans Thunar.
+        fs_format = "ext4" if self.os_name == OS_LINUX else None
         vol, ids = self.ctx.backend.create_volume(self.size, self.volume_name, desktop_labels(self.slug),
-                                                  self.server_id)
+                                                  self.server_id, fs_format)
         wait_actions(self.ctx.backend, ids, self, timeout_s=300)
-        self.result = {"volume_id": vol.id}
+        self.result = {"volume_id": vol.id, "os": self.os_name}
         self.followup = "volume_help"
         self.success_message = f"Volume « {vol.name} » ({vol.size} Go) attaché à « {self.name} »"
 
@@ -53,6 +56,7 @@ class VolumeActionOp(Operation):
             self.set_phase(f"Agrandissement de {vol.name} à {self.size} Go…")
             wait_actions(backend, [backend.resize_volume(vol.id, self.size)], self, timeout_s=300)
             self.followup = "resize_help"
+            self.result = {"volume_id": vol.id}
             self.success_message = f"Volume « {vol.name} » agrandi à {self.size} Go"
         elif self.action == "delete":
             self.set_phase(f"Suppression de {vol.name}…")
@@ -188,14 +192,15 @@ class FixedIpOp(Operation):
 class AdoptSnapshotOp(Operation):
     title = "Importation"
 
-    def __init__(self, ctx: OpContext, slug: str, name: str, snapshot: SnapshotInfo, pin: bool):
+    def __init__(self, ctx: OpContext, slug: str, name: str, snapshot: SnapshotInfo, pin: bool,
+                 os_name: str = OS_WINDOWS):
         super().__init__(ctx, slug, name)
-        self.snapshot, self.pin = snapshot, pin
+        self.snapshot, self.pin, self.os_name = snapshot, pin, os_name
 
     def execute(self) -> None:
         backend = self.ctx.backend
         backend.update_image(self.snapshot.id, format_description(self.name, self.snapshot.created),
-                             desktop_labels(self.slug))
+                             desktop_labels(self.slug, **{L_OS: self.os_name}))
         if self.pin and not self.snapshot.protected:
             wait_actions(backend, [backend.set_image_protection(self.snapshot.id, True)], self, timeout_s=60)
         self.success_message = f"Bureau « {self.name} » importé"
@@ -204,12 +209,13 @@ class AdoptSnapshotOp(Operation):
 class AdoptServerOp(Operation):
     title = "Adoption du serveur"
 
-    def __init__(self, ctx: OpContext, slug: str, name: str, server: ServerInfo):
+    def __init__(self, ctx: OpContext, slug: str, name: str, server: ServerInfo, os_name: str = OS_WINDOWS):
         super().__init__(ctx, slug, name)
-        self.server = server
+        self.server, self.os_name = server, os_name
 
     def execute(self) -> None:
-        self.ctx.backend.update_server_labels(self.server.id, desktop_labels(self.slug, **{L_ROLE: ROLE_DESKTOP}))
+        self.ctx.backend.update_server_labels(
+            self.server.id, desktop_labels(self.slug, **{L_ROLE: ROLE_DESKTOP, L_OS: self.os_name}))
         self.success_message = f"Serveur {self.server.name} géré comme « {self.name} »"
 
 

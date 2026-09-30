@@ -421,7 +421,10 @@ class Desktop:
 
     @property
     def os(self) -> str:
-        """Système du bureau : label du snapshot le plus récent qui le porte, Windows par défaut."""
+        """Système du bureau : label du serveur en cours, sinon du snapshot le plus récent qui le porte ;
+        Windows par défaut (bureaux créés avant la prise en charge de Linux)."""
+        if self.server and self.server.labels.get(L_OS):
+            return self.server.labels[L_OS]
         return next((s.labels[L_OS] for s in self.snapshots if s.labels.get(L_OS)), OS_WINDOWS)
 
     @property

@@ -48,7 +48,7 @@ STATE_STYLE: dict[DState, tuple[str, str]] = {
     DState.CHECKPOINTING: ("Sauvegarde (reste allumé)", "accent"),
     DState.DISCARDING: ("Suppression…", "danger"),
     DState.DUPLICATING: ("Duplication…", "accent"),
-    DState.BUILDING: ("Installation de Windows…", "accent"),
+    DState.BUILDING: ("Installation…", "accent"),
     DState.BUSY: ("Opération en cours…", "info"),
     DState.INTERRUPTED: ("Opération interrompue", "warning"),
     DState.REMOTE_OP: ("Opération sur un autre poste", "warning"),

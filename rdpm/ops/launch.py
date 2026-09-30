@@ -8,8 +8,8 @@ from datetime import date
 
 from .. import license, netutil, rdp
 from ..constants import (
-    DEFAULT_FIREWALL_NAME, L_IMAGE, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_ROLE, OP_LABELS, OP_LAUNCHING,
-    ROLE_DESKTOP, ROLE_DESKTOP_FIREWALL, ROLE_RDP_FIREWALL,
+    DEFAULT_FIREWALL_NAME, L_CERT, L_IMAGE, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_OS, L_ROLE, OP_LABELS,
+    OP_LAUNCHING, OS_LABELS, OS_WINDOWS, ROLE_DESKTOP, ROLE_DESKTOP_FIREWALL, ROLE_RDP_FIREWALL,
 )
 from ..hetzner.errors import UserError, to_user_error
 from ..hetzner.waiting import wait_actions, wait_server_status
@@ -36,6 +36,7 @@ class LaunchParams:
     primary_ip_id: int | None = None
     rdp_user: str = "Administrator"
     auto_connect: bool = True
+    os_name: str = OS_WINDOWS                # système attendu (carte provisoire) ; le snapshot fait foi
 
 
 class LaunchOp(Operation):
@@ -46,6 +47,7 @@ class LaunchOp(Operation):
         super().__init__(ctx, slug, name)
         self.params = params
         self.server_id: int | None = None
+        self.os_name = params.os_name
 
     def execute(self) -> None:
         p, backend = self.params, self.ctx.backend
@@ -57,7 +59,9 @@ class LaunchOp(Operation):
         labels = desktop_labels(self.slug, **{
             L_ROLE: ROLE_DESKTOP, L_IMAGE: p.snapshot_id, L_OP: OP_LAUNCHING,
             L_OP_TS: int(time.time()), L_OP_HOST: self.ctx.host})
-        labels.update(self._eval_labels())
+        carried = self._carried_labels()
+        labels.update(carried)
+        self.os_name = carried.get(L_OS, self.params.os_name)
         self.set_phase(f"Création du serveur ({create_type}, {p.location})…", 0)
         server, action_ids = backend.create_server(
             name=server_name(self.slug), server_type=create_type, image_id=p.snapshot_id,
@@ -79,23 +83,30 @@ class LaunchOp(Operation):
             password = self.ctx.creds.get_password(self.slug)
             if password and rdp.write_termsrv_cred(ip, p.rdp_user, password):
                 self.ctx.config.add_cred(ip, self.slug)
-            rdp.write_rdp_file(self.slug, ip, p.rdp_user)
+            if rdp.trust_certificate(ip, carried.get(L_CERT), p.rdp_user):
+                self.ctx.config.add_cred(ip, self.slug)
+            rdp.write_rdp_file(self.slug, ip, p.rdp_user, self.os_name)
         self.result = {"server_id": server.id, "ip": ip, "auto_connect": p.auto_connect}
-        self.success_message = f"« {self.name} » démarre ({ip or 'sans IPv4'}) — Windows arrive…"
+        self.success_message = f"« {self.name} » démarre ({ip or 'sans IPv4'}) — le système arrive…"
 
-    def _eval_labels(self) -> dict[str, str]:
-        """Licence d'évaluation du snapshot lancé, telle qu'elle sera après le démarrage (prolongation auto)."""
+    def _carried_labels(self) -> dict[str, str]:
+        """Labels du snapshot qui suivent le bureau sur son serveur : système (Linux, distribution, certificat)
+        et licence d'évaluation telle qu'elle sera après le démarrage (prolongation automatique)."""
         try:
             snap = self.ctx.backend.get_image(self.params.snapshot_id)
-        except Exception:  # noqa: BLE001 - le suivi de licence ne doit jamais bloquer un lancement
+        except Exception:  # noqa: BLE001 - ces labels ne doivent jamais bloquer un lancement
             return {}
-        lic = license.from_labels(snap.labels) if snap else None
-        if lic is None:
+        if snap is None:
             return {}
-        lic, rearmed = license.at_boot(lic, date.today())
-        if rearmed:
-            self.log("Licence d'évaluation : prolongée automatiquement au démarrage (180 jours, un redémarrage de plus)")
-        return license.to_labels(lic)
+        labels = {k: v for k, v in snap.labels.items() if k in OS_LABELS}
+        lic = license.from_labels(snap.labels)
+        if lic is not None:
+            lic, rearmed = license.at_boot(lic, date.today())
+            if rearmed:
+                self.log("Licence d'évaluation : prolongée automatiquement au démarrage (180 jours, un "
+                         "redémarrage de plus)")
+            labels.update(license.to_labels(lic))
+        return labels
 
     def _prepare_firewalls(self) -> list[int]:
         """Pare-feux à appliquer au serveur : liste commune et liste propre au bureau (créées au besoin)."""
