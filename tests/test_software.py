@@ -290,3 +290,40 @@ def test_update_mode_and_stale_firewall_cleanup(harness):
     op = h.run(SoftwareOp(h.ctx, "perso", "Perso", srv.id, srv.ipv4, OS_LINUX, mode="update"))
     assert op.outcome == "ok", op.error
     assert "mis à jour" in op.success_message and _admin_firewalls(h) == []
+
+
+# --- contrôleur ------------------------------------------------------------------------------------------
+def test_controller_software_state_actions_and_stale_firewall_sweep(tmp_path):
+    from rdpm.models import FirewallRule
+    from rdpm.state import Act, DState
+    from tests.test_controller import make_controller, spin
+    fake, ctrl = make_controller(tmp_path)
+    spin(ctrl, lambda: ctrl.inventory and ctrl.static)
+    dev = ctrl.desktop("dev-perso")
+    assert ctrl.installed_apps(dev) >= {"git", "vscode"} and ctrl.admin_access(dev)
+    view = next(v for v in ctrl.desktop_views() if v.slug == "dev-perso")
+    assert Act.SOFTWARE in view.actions   # archivé : consultation
+    trading = ctrl.desktop("trading")
+    assert not ctrl.admin_access(trading) and ctrl.installed_apps(trading) == set()
+    with pytest.raises(Exception):
+        ctrl.software("dev-perso", ["codex"])   # pas lancé
+    # Pare-feu SSH resté d'une opération interrompue : retiré et supprimé au rafraîchissement suivant.
+    srv = trading.server
+    fw = ctrl.backend.create_firewall(f"{ADMIN_FW_PREFIX}trading-1", {"rdpm": "1", "rdpm-role": "tmp",
+                                                                      "rdpm-desktop": "trading"},
+                                      [FirewallRule("in", "tcp", "22", ("198.51.100.23/32",), "vieux")])
+    ctrl.backend.apply_firewall(fw.id, [srv.id])
+    ctrl.refresh_now()
+    spin(ctrl, lambda: fw.id not in fake.firewalls, timeout=30)
+    # Bureau lancé avec accès : installation, état « Logiciels en cours… », connexion toujours possible.
+    fake.servers[srv.id]["labels"]["rdpm-admin"] = "1"
+    ctrl.refresh_now()
+    spin(ctrl, lambda: ctrl.admin_access(ctrl.desktop("trading")))
+    ctrl.creds.set_password("trading", "Demo-Pass-123")
+    ctrl.software("trading", ["codex"])
+    view = spin(ctrl, lambda: next((v for v in ctrl.desktop_views()
+                                    if v.slug == "trading" and v.state == DState.INSTALLING), None))
+    assert view.primary == Act.CONNECT and Act.SAVE_CLOSE not in view.actions
+    spin(ctrl, lambda: not ctrl.runner.for_slug("trading"), timeout=40)
+    ctrl.refresh_now()
+    spin(ctrl, lambda: "codex" in ctrl.installed_apps(ctrl.desktop("trading")), timeout=20)

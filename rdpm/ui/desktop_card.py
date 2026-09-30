@@ -16,7 +16,7 @@ from .widgets import Pill, Tooltip, caption, ghost_button, label, logical, prima
 MENU_GROUPS = [
     [Act.CONNECT, Act.COPY_IP, Act.COPY_PASSWORD],
     [Act.CHECKPOINT, Act.SAVE_CLOSE, Act.RESUME],
-    [Act.ADD_VOLUME, Act.VOLUMES, Act.FIREWALL, Act.FIXED_IP],
+    [Act.SOFTWARE, Act.ADD_VOLUME, Act.VOLUMES, Act.FIREWALL, Act.FIXED_IP],
     [Act.HISTORY, Act.DUPLICATE, Act.RENAME, Act.CREDENTIALS, Act.LICENSE],
     [Act.POWER_ON, Act.REBOOT],
     [Act.IGNORE_OP, Act.DISCARD, Act.DELETE],

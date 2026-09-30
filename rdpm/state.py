@@ -26,6 +26,7 @@ class DState(str, Enum):
     DISCARDING = "discarding"
     DUPLICATING = "duplicating"
     BUILDING = "building"
+    INSTALLING = "installing"
     BUSY = "busy"
     INTERRUPTED = "interrupted"
     REMOTE_OP = "remote_op"
@@ -49,6 +50,7 @@ STATE_STYLE: dict[DState, tuple[str, str]] = {
     DState.DISCARDING: ("Suppression…", "danger"),
     DState.DUPLICATING: ("Duplication…", "accent"),
     DState.BUILDING: ("Installation…", "accent"),
+    DState.INSTALLING: ("Logiciels en cours…", "accent"),
     DState.BUSY: ("Opération en cours…", "info"),
     DState.INTERRUPTED: ("Opération interrompue", "warning"),
     DState.REMOTE_OP: ("Opération sur un autre poste", "warning"),
@@ -82,6 +84,7 @@ class Act(str, Enum):
     RESOLVE = "resolve"
     LICENSE = "license"
     CANCEL_OP = "cancel_op"
+    SOFTWARE = "software"
 
 
 ACT_LABELS: dict[Act, str] = {
@@ -108,15 +111,16 @@ ACT_LABELS: dict[Act, str] = {
     Act.RESOLVE: "Résoudre…",
     Act.LICENSE: "Licence d'évaluation…",
     Act.CANCEL_OP: "Annuler",
+    Act.SOFTWARE: "Logiciels…",
 }
 
-_RUNNING_ACTS = [Act.CONNECT, Act.SAVE_CLOSE, Act.CHECKPOINT, Act.DISCARD, Act.ADD_VOLUME,
+_RUNNING_ACTS = [Act.CONNECT, Act.SAVE_CLOSE, Act.CHECKPOINT, Act.DISCARD, Act.SOFTWARE, Act.ADD_VOLUME,
                  Act.VOLUMES, Act.FIREWALL, Act.COPY_IP, Act.COPY_PASSWORD, Act.REBOOT,
                  Act.CREDENTIALS, Act.HISTORY, Act.RENAME, Act.LICENSE]
 
 _ALLOWED: dict[DState, list[Act]] = {
     DState.EMPTY: [Act.CREDENTIALS, Act.DELETE],
-    DState.ARCHIVED: [Act.LAUNCH, Act.HISTORY, Act.DUPLICATE, Act.RENAME, Act.VOLUMES, Act.FIREWALL,
+    DState.ARCHIVED: [Act.LAUNCH, Act.SOFTWARE, Act.HISTORY, Act.DUPLICATE, Act.RENAME, Act.VOLUMES, Act.FIREWALL,
                       Act.FIXED_IP, Act.CREDENTIALS, Act.LICENSE, Act.DELETE],
     DState.SNAPSHOT_PENDING: [Act.HISTORY],
     DState.PENDING: [],
@@ -133,6 +137,8 @@ _ALLOWED: dict[DState, list[Act]] = {
     DState.DISCARDING: [],
     DState.DUPLICATING: [],
     DState.BUILDING: [Act.CANCEL_OP],
+    # Logiciels en cours d'installation : le bureau reste utilisable ; sauvegarde après la fin.
+    DState.INSTALLING: [Act.CONNECT, Act.SOFTWARE, Act.COPY_IP, Act.COPY_PASSWORD, Act.CANCEL_OP],
     DState.BUSY: [],
     DState.INTERRUPTED: [Act.RESUME, Act.IGNORE_OP, Act.DISCARD],
     DState.REMOTE_OP: [Act.RESUME, Act.IGNORE_OP, Act.DISCARD],
@@ -144,6 +150,7 @@ _PRIMARY: dict[DState, Act] = {
     DState.BOOTING: Act.CONNECT,
     DState.READY: Act.CONNECT,
     DState.UNREACHABLE: Act.CONNECT,
+    DState.INSTALLING: Act.CONNECT,
     DState.OFF_BILLED: Act.SAVE_CLOSE,
     DState.STOPPING: Act.SAVE_CLOSE,
     DState.INTERRUPTED: Act.RESUME,
@@ -158,6 +165,7 @@ OP_STATES = {
     "discard": DState.DISCARDING,
     "duplicate": DState.DUPLICATING,
     "build": DState.BUILDING,
+    "software": DState.INSTALLING,
 }
 
 

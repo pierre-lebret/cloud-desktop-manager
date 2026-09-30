@@ -576,7 +576,8 @@ class FakeCloud:
             self.images[iid] = {
                 "id": iid, "type": "snapshot", "status": "available", "name": None,
                 "description": f"Dev perso — {created.astimezone():%Y-%m-%d %H:%M}",
-                "labels": {**lab, "rdpm-type": "cpx32", "rdpm-loc": "nbg1"},
+                "labels": {**lab, "rdpm-type": "cpx32", "rdpm-loc": "nbg1", L_ADMIN: "1",
+                           L_APPS: apps_catalog.encode(["git", "node", "python", "vscode", "claude_code"])},
                 "created": _iso(created), "image_size": size, "disk_size": 160, "architecture": "x86",
                 "protection": {"delete": pinned}, "os_flavor": "ubuntu",
                 "created_from": {"id": 1, "name": "rdpm-dev-perso"}, "deprecated": None}

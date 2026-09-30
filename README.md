@@ -110,7 +110,7 @@ charge) — 36 min au total pour un Windows Server 2025 de 5,3 Go.
 
 *+ Nouveau bureau → Linux → Créer un bureau Linux…* : nom, distribution (**Ubuntu 26.04 LTS** ou **Debian 13**),
 identifiant du compte, langue, fuseau horaire, emplacement et type. Tout est automatique (environ 10 à 20 minutes,
-plus le snapshot) ; la carte affiche l'étape en cours (« Installation 4/6 : compilation d'xrdp… »).
+plus le snapshot) ; la carte affiche l'étape en cours (« Installation 4/7 : compilation d'xrdp… »).
 
 **Pourquoi ce choix** : un bureau distant sur un serveur sans carte graphique doit éviter tout rendu OpenGL
 logiciel (c'est ce qui rend Cinnamon ou GNOME saccadés à distance) et envoyer une image compressée efficacement.
@@ -136,6 +136,53 @@ logiciel (c'est ce qui rend Cinnamon ou GNOME saccadés à distance) et envoyer 
   (`/var/log/rdpm-install.log`, `journalctl -u rdpm-install`).
 - **Importer** un snapshot ou serveur Linux existant : onglet Linux de *+ Nouveau bureau* (xrdp doit y être installé).
 
+## Logiciels prêts à l'emploi
+
+À la création d'un bureau (Windows ou Linux), une **liste à cocher** propose les outils de l'IA agentique et du
+développement ; le préréglage **Recommandé** est coché par défaut (Git, GitHub CLI, Python + uv, Node.js,
+VS Code, Claude Code, Codex CLI, Chrome), avec **Tout** et **Aucun**. Le formulaire affiche le temps et la place
+ajoutés, et le coût du stockage en tient compte.
+
+| Catégorie | Logiciels |
+|---|---|
+| Assistants IA | Claude Desktop, ChatGPT (avec Codex) |
+| Agents IA autonomes | OpenClaw, Hermes Agent (Nous Research) |
+| Agents de code | Claude Code, Codex CLI, GitHub Copilot CLI, OpenCode, Cursor CLI, Google Antigravity CLI |
+| Éditeurs | Visual Studio Code, Cursor, Google Antigravity (Windows) |
+| Langages | Python + uv, Node.js LTS (npm, pnpm), Bun, Go, Rust, Java (JDK LTS), .NET SDK |
+| Outils | Git, GitHub CLI, Docker (Linux), outils en ligne de commande (ripgrep, fd, jq, fzf…), Windows Terminal + PowerShell 7 |
+| IA locale | Ollama (sans GPU : petits modèles seulement) |
+| Navigateur | Google Chrome |
+
+- **Toujours à jour** : chaque logiciel vient de son canal officiel (dépôt APT de l'éditeur à clé vérifiée, winget,
+  npm, installeur officiel) dans sa dernière version. Les dépôts APT suivent les mises à jour automatiques ; le reste
+  est mis à jour chaque semaine (minuteur systemd sous Linux) ou par le raccourci « Mettre à jour les logiciels ».
+- **Dépendances** ajoutées d'office (OpenClaw → Node.js…), avec la mention dans la liste.
+- **Comptes et clés d'API** : jamais demandés par l'application ; tu te connectes dans chaque logiciel à son premier
+  lancement. Le fichier **« Premiers pas »** du Bureau donne la première commande de chacun (`claude`, `codex`,
+  `openclaw onboard --install-daemon`, `hermes setup`…).
+- **Un échec n'arrête rien** : le bureau est créé, le récapitulatif liste ce qui manque, à réessayer ensuite.
+- **Indisponibles et grisés, avec la raison** : Docker sous Windows et Claude Cowork (pas de virtualisation imbriquée
+  chez Hetzner), l'éditeur Antigravity sous Linux (pas de paquet installable automatiquement).
+
+**Plus tard, deux chemins :**
+
+- **Depuis l'application** (bureau lancé) : menu ⋯ → **Logiciels…**. Les logiciels déjà présents sont cochés et
+  grisés ; « Installer (n) » ou « Tout mettre à jour ». L'installation se fait pendant que tu travailles (carte
+  « Logiciels en cours… ») ; **Sauvegarder & fermer** la conserve dans la sauvegarde.
+- **Depuis le bureau** : raccourci **Logiciels** (menu Applications sous Linux, Bureau sous Windows), même liste.
+
+**Sécurité de l'installation depuis l'application** : une **clé d'administration** propre à ce PC
+(`%APPDATA%\cloud-desktop-manager\keys\admin_ed25519`) est posée sur chaque bureau construit (root sous Linux ;
+OpenSSH activé sous Windows, connexion par clé seulement). Le **port SSH reste fermé** : chaque opération crée un
+pare-feu temporaire limité à ton IP publique, puis le retire et le supprime (même en cas d'annulation ; un reste
+éventuel est nettoyé au rafraîchissement suivant). Sous Windows, l'installation tourne en tâche planifiée sous ton
+compte (winget en a besoin) ; la tâche, qui garde le mot de passe, est supprimée à la fin. Un bureau créé avant
+cette fonction (ou depuis un autre PC) : « Logiciels… » affiche une commande à coller une fois dans le bureau.
+
+Journaux sur le bureau : `/var/log/rdpm-apps.log` (Linux), `C:\ProgramData\CloudDesktop\apps.log` (Windows).
+En ligne de commande sous Linux : `rdpm-apps list`, `sudo rdpm-apps install codex openclaw`, `sudo rdpm-apps update`.
+
 ## Utilisation au quotidien
 
 - **Lancer** : choisis la version, l'emplacement et le type ; le prix est affiché et seuls les types compatibles et disponibles sont proposés. Ton IP est autorisée si besoin, pour ce bureau seulement ou pour tous les bureaux.
@@ -143,7 +190,7 @@ logiciel (c'est ce qui rend Cinnamon ou GNOME saccadés à distance) et envoyer 
 - **Sauvegarder & fermer** : arrêt propre de Windows, snapshot vérifié, suppression du serveur, rétention des anciennes versions.
 - **Sauvegarder (reste allumé)** : snapshot puis redémarrage automatique.
 - **Fermer sans sauvegarder** : suppression immédiate, après avoir tapé CONFIRM (majuscules ou minuscules) pour confirmer. Les autres suppressions (volume, sauvegarde, bureau) demandent la même confirmation.
-- **Menu ⋯** : volumes, accès RDP, IP fixe, historique des sauvegardes, duplication, renommage, identifiants, suppression.
+- **Menu ⋯** : logiciels, volumes, accès RDP, IP fixe, historique des sauvegardes, duplication, renommage, identifiants, suppression.
 - Les boutons sans objet sont grisés (formulaire incomplet ou inchangé, opération en cours, bureau qui démarre…) ;
   une info-bulle explique pourquoi quand ce n'est pas évident.
 
@@ -188,7 +235,9 @@ Plusieurs bureaux peuvent tourner en même temps ; chaque carte suit son propre 
 - `sessions.jsonl` : historique des coûts ;
 - `logs\app.log` : journal, avec le token et les mots de passe générés masqués ;
 - `rdp\*.rdp` : fichiers de connexion ;
-- `build\` : clés SSH éphémères d'une création de Windows en cours (supprimées à la fin).
+- `build\` : clés SSH éphémères d'une création en cours (supprimées à la fin) ;
+- `keys\admin_ed25519` : clé d'administration des bureaux (installation de logiciels depuis l'application) ;
+  à sauvegarder si tu changes de PC, sinon « Logiciels… » propose de réactiver l'accès.
 
 L'état des bureaux, lui, vit dans les labels du fournisseur (labels Hetzner) : il se retrouve tel quel sur un autre PC.
 

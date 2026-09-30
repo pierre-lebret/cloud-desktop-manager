@@ -45,7 +45,8 @@ def follow_apps(op: Operation, run_status, *, timeout_s: float, prefix: str = "L
                 last = prog.current
                 if prog.current:
                     op.log(f"{prefix} {prog.label}")
-            op.set_phase(f"{prefix} {prog.label} · {elapsed}", prog.percent(), cancellable=True)
+            text = f"{prefix} {prog.label}" if prog.current else f"{prefix} : préparation"
+            op.set_phase(f"{text} · {elapsed}", prog.percent(), cancellable=True)
             stopped = stopped + 1 if status.unit in ("inactive", "failed", "unknown") else 0
             if stopped >= 3:
                 prog.failed += [k for k in _pending(prog) if k not in prog.failed]

@@ -28,7 +28,7 @@ from .dialogs.build_linux import LinuxBuildDialog
 from .dialogs.launch import LaunchDialog
 from .dialogs.manage import (
     AddVolumeDialog, ConflictDialog, CredentialsDialog, DeleteDesktopDialog, DuplicateDialog, FirewallDialog,
-    FixedIpDialog, SnapshotsDialog, VolumesDialog, resize_help, volume_help,
+    FixedIpDialog, SnapshotsDialog, SoftwareDialog, VolumesDialog, resize_help, volume_help,
 )
 from .dialogs.misc import AdoptDialog, DormantDialog, ImportChooser, SettingsDialog
 from .dialogs.quit import DecisionDialog, QuitDialog, QuitProgressDialog
@@ -681,6 +681,7 @@ class MainWindow(ctk.CTk):
             Act.IGNORE_OP: lambda: self._ignore_op(sc, d),
             Act.RESOLVE: lambda: ConflictDialog(sc, d),
             Act.CANCEL_OP: lambda: ctrl.cancel_op(slug),
+            Act.SOFTWARE: lambda: SoftwareDialog(sc, d),
         }
         handler = handlers.get(act)
         if handler:
