@@ -122,10 +122,10 @@ class LaunchDialog(Modal):
         self._network_section()
         self._volume_section()
         self.section("Options", parent=self.right)
-        ctk.CTkCheckBox(self.right, text="Connexion automatique quand Windows est prêt",
+        ctk.CTkCheckBox(self.right, text="Connexion automatique dès que le bureau est prêt",
                         variable=self.auto_var, font=t.font(12)).pack(anchor="w")
         if not self.ctrl.creds.get_password(desktop.slug) and not new_name:
-            label(self.right, "Aucun mot de passe enregistré : Windows le demandera à la connexion "
+            label(self.right, "Aucun mot de passe enregistré : il sera demandé à la connexion "
                               "(menu ⋯ → Identifiants RDP… pour la connexion en 1 clic).", 11, color=t.MUTED,
                   wraplength=340).pack(fill="x", pady=(4, 0))
 
@@ -217,32 +217,43 @@ class LaunchDialog(Modal):
         self.section("Réseau et accès", pady=(10, 6), parent=self.right)
         ip_box = ctk.CTkFrame(self.right, fg_color="transparent")
         ip_box.pack(fill="x")
-        ctk.CTkRadioButton(ip_box, text="IP dynamique (gratuite, change\nà chaque lancement)",
+        ctk.CTkRadioButton(ip_box, text="IP dynamique (change à chaque\nlancement)",
                            variable=self.fixed_var, value=False, font=t.font(12)).pack(anchor="w")
         if self.fixed:
             ctk.CTkRadioButton(ip_box, text=f"IP fixe {self.fixed.ip} ({self._city(self.fixed.location)})",
                                variable=self.fixed_var, value=True, font=t.font(12)).pack(anchor="w", pady=(4, 0))
 
+        # Accès RDP : liste commune (ou pare-feu à importer) + liste propre au bureau (pas pour une copie).
         fw = self.ctrl.rdp_firewall() or next(iter(self.ctrl.grouping.adoptable_firewalls), None)
-        self.firewall = fw
+        own = None if self.new_name else self.desktop.firewall
+        self.firewall, self.own_firewall = fw, own
         ip = self.ctrl.public_ip
         self.fw_mode = "none"
+        self.scope_var = tk.StringVar(value="Ce bureau" if own or not fw else "Tous les bureaux")
         box = ctk.CTkFrame(self.right, fg_color="transparent")
         box.pack(fill="x", pady=(10, 0))
-        if fw:
-            allowed = netutil.ip_allowed(ip, [c for c, _ in netutil.rdp_sources(fw.rules)]) if ip else None
+        fws = [f for f in (fw, own) if f]
+        if fws:
+            sources = [c for f in fws for c, _ in netutil.rdp_sources(f.rules)]
+            allowed = netutil.ip_allowed(ip, sources) if ip else None
             if allowed:
                 self.fw_mode = "ok"
-                label(box, f"✓  Pare-feu « {fw.name} » : ton IP {ip} est autorisée", 12,
+                label(box, f"✓  Accès RDP : ton IP {ip} est autorisée", 12,
                       color=t.tone("success")[0], wraplength=340).pack(anchor="w")
             elif ip:
                 self.fw_mode = "allow"
-                ctk.CTkCheckBox(box, text=f"Autoriser mon IP {ip} sur le pare-feu\n« {fw.name} » avant le lancement",
-                                variable=self.allow_var, font=t.font(12)).pack(anchor="w")
-                label(box, "Sinon, le bureau sera injoignable depuis ce poste.", 11, color=t.MUTED).pack(anchor="w")
+                ctk.CTkCheckBox(box, text=f"Autoriser mon IP {ip} avant le lancement", variable=self.allow_var,
+                                font=t.font(12)).pack(anchor="w")
+                if fw:
+                    ctk.CTkSegmentedButton(box, values=["Ce bureau", "Tous les bureaux"], variable=self.scope_var,
+                                           font=t.font(11), height=26, selected_color=t.ACCENT,
+                                           selected_hover_color=t.ACCENT_HOVER).pack(anchor="w", padx=(28, 0),
+                                                                                     pady=(4, 0))
+                label(box, "Sinon, le bureau sera injoignable depuis ce poste.", 11, color=t.MUTED).pack(
+                    anchor="w", pady=(2, 0))
             else:
-                label(box, f"Pare-feu « {fw.name} » appliqué · ton IP publique est inconnue, vérifie l'accès "
-                           "après le lancement.", 12, color=t.tone("warning")[0], wraplength=340).pack(anchor="w")
+                label(box, "Accès RDP filtrés · ton IP publique est inconnue, vérifie l'accès après le lancement.",
+                      12, color=t.tone("warning")[0], wraplength=340).pack(anchor="w")
         elif ip:
             self.fw_mode = "create"
             ctk.CTkCheckBox(box, text=f"Créer un pare-feu RDP limité\nà mon IP {ip} (recommandé)",
@@ -273,13 +284,15 @@ class LaunchDialog(Modal):
             child.destroy()
         if not self.snapshot:
             self.offer_frame.render([])
+            self.cost.configure(text="—")
+            self.launch_btn.configure(state="disabled")
             return
         loc = self.loc_var.get()
         self.offers = compatible_offers(self.static.server_types, loc, self.snapshot.disk_size,
                                         self.snapshot.architecture, self.show_unavailable.get())
         available = [o for o in self.offers if o.available]
         empty = None if available else (f"Aucun type compatible (disque ≥ {self.snapshot.disk_size} Go) disponible "
-                                        f"à {self._city(loc)} en ce moment. Essayez un autre emplacement.")
+                                        f"à {self._city(loc)} en ce moment. Essaie un autre emplacement.")
         if self.type_var.get() not in {o.name for o in available}:
             rec = next((o for o in available if o.recommended), available[0] if available else None)
             self.type_var.set(rec.name if rec else "")
@@ -338,12 +351,15 @@ class LaunchDialog(Modal):
             return
         ip = self.ctrl.public_ip
         cidr = netutil.normalize_cidr(ip) if ip else None
-        fw = self.firewall
+        fw, own = self.firewall, self.own_firewall
+        scope = "desktop" if self.scope_var.get() == "Ce bureau" or not fw else "shared"
         params = LaunchParams(
             snapshot_id=self.snapshot.id, snapshot_disk=self.snapshot.disk_size, server_type=offer.name,
             location=offer.location,
             base_type=None if self.grow_var.get() else offer.base_type,
             firewall_id=fw.id if fw else None,
+            desktop_firewall_id=own.id if own else None,
+            allow_scope=scope,
             create_firewall_cidr=cidr if self.fw_mode == "create" and self.allow_var.get() else None,
             allow_cidr=cidr if self.fw_mode == "allow" and self.allow_var.get() else None,
             allow_description="Mon IP",

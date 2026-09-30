@@ -1,4 +1,6 @@
-"""Hetzner RDP Manager — lance, sauvegarde et ferme des bureaux Windows à la demande.
+"""Cloud Desktop Manager — lance, sauvegarde et ferme des bureaux cloud à la demande.
+
+Fournisseur pris en charge : Hetzner Cloud. Système : Windows (Linux prévu).
 
 Usage :
     python app.py                 comptes Hetzner réels : la clé HETZNER_TOKEN du .env (toujours chargée) plus
@@ -23,7 +25,7 @@ from dotenv import dotenv_values
 
 from rdpm import rdp
 from rdpm.config import AppConfig, SessionLog
-from rdpm.constants import APP_NAME, CONFIG_PATH, LOG_DIR, SESSIONS_PATH
+from rdpm.constants import APP_NAME, APP_TITLE, CONFIG_PATH, LOG_DIR, SESSIONS_PATH
 
 HERE = Path(__file__).resolve().parent
 
@@ -75,8 +77,8 @@ def resolve_token(creds: rdp.CredentialStore) -> tuple[str | None, str | None]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Gestionnaire de bureaux Windows Hetzner")
-    parser.add_argument("--fake", action="store_true", help="simulation sans appel à Hetzner")
+    parser = argparse.ArgumentParser(description="Cloud Desktop Manager : bureaux cloud à la demande")
+    parser.add_argument("--fake", action="store_true", help="simulation sans appel au fournisseur")
     parser.add_argument("--fake-speed", type=float, default=8.0, help="accélération du temps en simulation")
     parser.add_argument("--fake-fail", default="", help="pannes simulées, séparées par des virgules")
     parser.add_argument("--fake-seed", default="demo", choices=("demo", "account"),
@@ -128,7 +130,7 @@ def main() -> int:
         mutex = notify.single_instance(APP_NAME)
         if mutex is None:
             import tkinter.messagebox as mb
-            mb.showwarning(APP_NAME, "L'application est déjà ouverte.")
+            mb.showwarning(APP_TITLE, "L'application est déjà ouverte.")
             return 1
         creds = rdp.CredentialStore()
         config = AppConfig.load(CONFIG_PATH)

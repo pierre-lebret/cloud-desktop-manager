@@ -107,8 +107,8 @@ class QuitProgressDialog(Modal):
             self.after(1500, self.app.hard_exit)
             return
         failed = sum(1 for r in rows if r.status == "failed")
-        self.status.configure(text=f"{failed} échec(s) : choisissez quoi faire pour chaque bureau." if failed
-                              else "Sauvegarde en cours… ne coupez pas Internet.",
+        self.status.configure(text=f"{failed} échec(s) : choisis quoi faire pour chaque bureau." if failed
+                              else "Sauvegarde en cours… ne coupe pas Internet.",
                               text_color=t.tone("danger")[0] if failed else t.MUTED)
         self.after(500, self._step)
 
