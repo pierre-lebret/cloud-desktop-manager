@@ -207,12 +207,15 @@ Get-ScheduledTask -TaskPath '\\rdpm\\' | Select-Object TaskName, State | Out-Str
 """
 
 
-def render_postinstall_ps1(timezone: str, eval_rearm_days: int | None = None) -> str:
+def render_postinstall_ps1(timezone: str, eval_rearm_days: int | None = None, admin_pubkey: str = "") -> str:
     """Réglages appliqués une fois par SetupComplete.cmd (compte SYSTEM, avant la première ouverture
     de session). ASCII seulement : PowerShell 5 lit un .ps1 sans BOM en ANSI.
 
     `eval_rearm_days` : installe la tâche de prolongation automatique de la licence d'évaluation (seuil
     en jours) ; None pour une ISO personnalisée.
+
+    `admin_pubkey` : active OpenSSH Server (clé seulement) avec la clé d'administration de l'application,
+    pour installer des logiciels ; en dernier, juste avant le témoin de fin, que l'application attend.
 
     Le réseau n'est jamais modifié : reinstall.sh laisse Windows en DHCP (Ubuntu Hetzner l'est), et forcer
     le DHCP ici a coupé le réseau lors des essais réels."""
@@ -221,6 +224,11 @@ def render_postinstall_ps1(timezone: str, eval_rearm_days: int | None = None) ->
     if eval_rearm_days is not None:
         eval_step = ("Step 'Prolongation automatique de la licence d evaluation' {\n"
                      + render_eval_task_install(eval_rearm_days) + "}\n")
+    admin_step = ""
+    if admin_pubkey:
+        from ..software.windows import render_admin_access_ps1
+        admin_step = ("Step 'Acces d administration (OpenSSH, cle seulement)' {\n"
+                      + render_admin_access_ps1(admin_pubkey) + "}\n")
     return f"""# rdpm-postinstall.ps1 - execute une fois par SetupComplete.cmd (SYSTEM) ; journal C:\\rdpm-postinstall.log
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
@@ -264,6 +272,7 @@ Step 'Reseau (etat, sans modification)' {{
     Get-NetIPConfiguration -ErrorAction SilentlyContinue | Out-String -Width 200
 }}
 {eval_step}Step 'TRIM du disque' {{ Optimize-Volume -DriveLetter C -ReTrim -ErrorAction SilentlyContinue }}
+{admin_step}
 Set-Content -Path 'C:\\rdpm-postinstall.done' -Value (Get-Date -Format s)
 Remove-Item 'C:\\rdpm-locale.xml' -ErrorAction SilentlyContinue
 Write-Output '== termine'

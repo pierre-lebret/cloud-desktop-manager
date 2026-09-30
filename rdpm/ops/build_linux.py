@@ -18,10 +18,11 @@ from ..build.linux_scripts import INSTALL_STEPS, LINUX_STATUS, linux_finalize, l
 from ..constants import L_CERT, L_DISTRO, L_OS, L_XRDP, OS_LINUX
 from ..hetzner.errors import UserError
 from ..labels import is_valid_label_value
+from ..software import catalog as software_catalog
+from ..software.progress import parse_app_marks, parse_status
 from .base import OpContext
 from .build import BaseBuildOp
 
-_STEP_RE = re.compile(r"^RDPM-STEP (\d+)/(\d+) (.+)$")
 
 
 @dataclass
@@ -34,6 +35,7 @@ class LinuxBuildParams:
     location: str
     allow_cidr: str
     pin: bool = True
+    apps: tuple[str, ...] = ()
 
     @property
     def system_image(self) -> str:
@@ -42,41 +44,6 @@ class LinuxBuildParams:
     @property
     def admin_account(self) -> str:
         return self.username
-
-
-@dataclass
-class InstallStatus:
-    unit: str                 # ActiveState de l'unité rdpm-install (« unknown » si illisible)
-    marks: list[str]
-    tail: str
-
-    @property
-    def done(self) -> bool:
-        return "RDPM-DONE" in self.marks
-
-    @property
-    def failure(self) -> str | None:
-        failed = [m for m in self.marks if m.startswith("RDPM-FAILED")]
-        return failed[-1][len("RDPM-FAILED"):].strip() if failed else None
-
-    @property
-    def step(self) -> tuple[int, int, str] | None:
-        for mark in reversed(self.marks):
-            m = _STEP_RE.match(mark)
-            if m:
-                return int(m.group(1)), int(m.group(2)), m.group(3)
-        return None
-
-
-def parse_status(out: str) -> InstallStatus:
-    unit = "unknown"
-    head, _, rest = out.partition("RDPM_MARKS_BEGIN")
-    for line in head.splitlines():
-        if line.startswith("RDPM_UNIT "):
-            unit = (line.split() + ["unknown"])[1]
-    marks_text, _, tail = rest.partition("RDPM_TAIL_BEGIN")
-    marks = [m.strip() for m in marks_text.splitlines() if m.strip().startswith("RDPM-")]
-    return InstallStatus(unit, marks, tail.strip())
 
 
 class LinuxBuildOp(BaseBuildOp):
@@ -123,7 +90,8 @@ class LinuxBuildOp(BaseBuildOp):
                      "fermer » risquent d'être forcés", "warning")
 
     def _snapshot_labels(self) -> dict[str, str]:
-        labels = {L_OS: OS_LINUX, L_DISTRO: self.params.distro}
+        labels = super()._snapshot_labels()
+        labels.update({L_OS: OS_LINUX, L_DISTRO: self.params.distro})
         if self.xrdp_version and is_valid_label_value(self.xrdp_version):
             labels[L_XRDP] = self.xrdp_version
         if self.cert:
@@ -143,12 +111,15 @@ class LinuxBuildOp(BaseBuildOp):
                 f"« journalctl -u rdpm-install »), RDP avec le compte {self.params.username} "
                 "(mot de passe enregistré).")
 
+    def _apps(self) -> list[str]:
+        return software_catalog.resolve(self.params.apps, OS_LINUX)
+
     # --- étapes Linux --------------------------------------------------------------------------------
     def _prepare(self) -> None:
         p = self.params
         self.set_phase("Préparation : compte utilisateur, lancement de l'installation…", cancellable=True)
         install = render_install_script(distro=p.distro, username=p.username, locale=p.locale,
-                                        timezone=p.timezone)
+                                        timezone=p.timezone, apps=self._apps())
         script = linux_prepare(username=p.username, password=self.password, install_script=install)
         r = self._run(script, self._cfg("build_prepare_timeout_s"), shell="bash")
         if not r.ok or "RDPM_STARTED" not in r.out:
@@ -167,7 +138,9 @@ class LinuxBuildOp(BaseBuildOp):
             if r.ok and "RDPM_MARKS_BEGIN" in r.out:
                 unreachable = 0
                 status = parse_status(r.out)
+                apps = parse_app_marks(status.marks)
                 if status.done:
+                    self._record_apps(apps)
                     self.set_progress(100, f"Installation terminée · {elapsed}")
                     self.log(f"Installation terminée en {elapsed}")
                     return
@@ -179,10 +152,16 @@ class LinuxBuildOp(BaseBuildOp):
                 if step:
                     i, total, label = step
                     total = total or INSTALL_STEPS
+                    done_part = 0.0
+                    if i == total and apps.current:   # étape « Logiciels » : un jalon par logiciel
+                        label = f"Logiciels {apps.label}"
+                        step = (i, total, label)
+                        done_part = (apps.percent() or 0) / 100
                     if step != last_step:
                         self.log(f"Installation {i}/{total} : {label}")
                         last_step = step
-                    self.set_progress(int((i - 1) / total * 100), f"Installation {i}/{total} : {label} · {elapsed}")
+                    self.set_progress(int((i - 1 + done_part) / total * 100),
+                                      f"Installation {i}/{total} : {label} · {elapsed}")
                 else:
                     self.set_phase(f"Installation : démarrage… · {elapsed}", cancellable=True)
                 # Unité arrêtée sans « terminé » : tuée (mémoire), arrêt ou redémarrage du serveur.
@@ -205,9 +184,19 @@ class LinuxBuildOp(BaseBuildOp):
                                 code="build_installer_timeout", retryable=True)
             self.sleep(10)
 
+    def _record_apps(self, apps) -> None:
+        wanted = self._apps()
+        self.apps_ok = [k for k in wanted if k in apps.ok]
+        self.apps_failed = [k for k in wanted if k not in apps.ok]
+        if self.apps_failed:
+            self.log(f"Logiciels non installés : {', '.join(software_catalog.names(self.apps_failed))} (réessaie "
+                     "depuis « Logiciels… » une fois le bureau lancé)", "warning")
+        elif wanted:
+            self.log(f"Logiciels installés : {', '.join(software_catalog.names(self.apps_ok))}")
+
     def _finalize(self) -> None:
         self.set_phase("Test d'une session XFCE et nettoyage…", 98, cancellable=True)
-        r = self._run(linux_finalize(self.params.username), 300, shell="bash")
+        r = self._run(linux_finalize(self.params.username, self.admin_pubkey), 300, shell="bash")
         if not r.ok or "RDPM_FINALIZED" not in r.out:
             raise UserError("Finalisation du bureau impossible", self._tail(r) or f"code {r.rc}",
                             code="build_finalize_failed")
@@ -219,6 +208,8 @@ class LinuxBuildOp(BaseBuildOp):
                 self.cert = value.strip().upper()
             elif key == "RDPM_XRDP" and value.strip():
                 self.xrdp_version = value.strip()
+            elif key == "RDPM_ADMIN":
+                self.admin_ok = value.strip() == "1"
         if self.session_ok:
             self.log("Session XFCE de test ouverte avec succès")
         else:

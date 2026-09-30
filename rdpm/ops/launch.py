@@ -9,7 +9,7 @@ from datetime import date
 from .. import license, netutil, rdp
 from ..constants import (
     DEFAULT_FIREWALL_NAME, L_CERT, L_IMAGE, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_OS, L_ROLE, OP_LABELS,
-    OP_LAUNCHING, OS_LABELS, OS_WINDOWS, ROLE_DESKTOP, ROLE_DESKTOP_FIREWALL, ROLE_RDP_FIREWALL,
+    OP_LAUNCHING, OS_LABELS, OS_WINDOWS, SOFTWARE_LABELS, ROLE_DESKTOP, ROLE_DESKTOP_FIREWALL, ROLE_RDP_FIREWALL,
 )
 from ..hetzner.errors import UserError, to_user_error
 from ..hetzner.waiting import wait_actions, wait_server_status
@@ -90,15 +90,16 @@ class LaunchOp(Operation):
         self.success_message = f"« {self.name} » démarre ({ip or 'sans IPv4'}) — le système arrive…"
 
     def _carried_labels(self) -> dict[str, str]:
-        """Labels du snapshot qui suivent le bureau sur son serveur : système (Linux, distribution, certificat)
-        et licence d'évaluation telle qu'elle sera après le démarrage (prolongation automatique)."""
+        """Labels du snapshot qui suivent le bureau sur son serveur : système (Linux, distribution, certificat),
+        logiciels installés, accès d'administration, et licence d'évaluation telle qu'elle sera après le
+        démarrage (prolongation automatique)."""
         try:
             snap = self.ctx.backend.get_image(self.params.snapshot_id)
         except Exception:  # noqa: BLE001 - ces labels ne doivent jamais bloquer un lancement
             return {}
         if snap is None:
             return {}
-        labels = {k: v for k, v in snap.labels.items() if k in OS_LABELS}
+        labels = {k: v for k, v in snap.labels.items() if k in OS_LABELS + SOFTWARE_LABELS}
         lic = license.from_labels(snap.labels)
         if lic is not None:
             lic, rearmed = license.at_boot(lic, date.today())

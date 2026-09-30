@@ -29,7 +29,7 @@ from ..build.scripts import (
     render_postinstall_ps1, ubuntu_prepare,
 )
 from ..constants import (
-    BUILD_DIR, EVAL_ALERT_DAYS, L_DESKTOP, L_FORCED, L_LOC, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_ROLE, L_SRC_SERVER, L_TYPE,
+    ADMIN_KEY_PATH, BUILD_DIR, L_ADMIN, L_APPS, EVAL_ALERT_DAYS, L_DESKTOP, L_FORCED, L_LOC, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_ROLE, L_SRC_SERVER, L_TYPE,
     L_OS, OS_WINDOWS,
     OP_BUILDING, ROLE_TMP,
 )
@@ -37,8 +37,12 @@ from ..hetzner.errors import OpCancelled, UserError, api_code
 from ..hetzner.waiting import wait_actions
 from ..labels import desktop_labels, format_description, tmp_server_name
 from ..models import FirewallRule
+from ..software import catalog as software_catalog
+from ..software import windows as win_apps
+from ..software.windows import POSTINSTALL_DONE
 from .base import OpContext, Operation
 from .common import delete_server_with_retry, stop_system, wait_snapshot_ready
+from .software import follow_apps
 
 BUILD_PREFIX = "rdpm-build-"
 ALPINE_USER = "administrator"   # reinstall.sh crée cet utilisateur (clé + sudo) dans l'environnement Alpine
@@ -58,6 +62,7 @@ class BuildParams:
     allow_cidr: str
     pin: bool = True
     system_image: str = catalog.SYSTEM_IMAGE
+    apps: tuple[str, ...] = ()
 
 
 class BaseBuildOp(Operation):
@@ -77,6 +82,10 @@ class BaseBuildOp(Operation):
         self.ssh_key_id: int | None = None
         self.image_id: int | None = None
         self.pubkey = ""
+        self.admin_pubkey = ""   # clé d'administration de l'application, posée sur le bureau
+        self.admin_ok = False
+        self.apps_ok: list[str] = []
+        self.apps_failed: list[str] = []
         self.ssh_user = "root"
         self.stamp = int(time.time())   # suffixe unique des ressources temporaires (clé, pare-feu)
         self.key_path = BUILD_DIR / f"{slug}.key"
@@ -111,8 +120,20 @@ class BaseBuildOp(Operation):
     def _after_shutdown(self, forced: bool) -> None:
         """Réaction à un arrêt forcé (sans conséquence pour un Windows neuf)."""
 
+    def _after_rdp(self) -> None:
+        """Étapes une fois le bureau joignable en RDP, avant l'arrêt (Windows : logiciels)."""
+
     def _snapshot_labels(self) -> dict[str, str]:
-        return {L_OS: self.os_name}
+        labels = {L_OS: self.os_name}
+        if self.admin_ok:
+            labels[L_ADMIN] = "1"
+        if self.apps_ok:
+            labels[L_APPS] = software_catalog.encode(self.apps_ok)
+        return labels
+
+    def _apps_result(self) -> dict:
+        return {"apps": list(getattr(self.params, "apps", ()) or ()), "apps_ok": list(self.apps_ok),
+                "apps_failed": list(self.apps_failed), "admin_ok": self.admin_ok}
 
     def _result_extra(self) -> dict:
         return {}
@@ -135,8 +156,8 @@ class BaseBuildOp(Operation):
         text = (result.err.strip() or result.out.strip()) if result else ""
         return self._redact("\n".join(text.splitlines()[-lines:]))
 
-    def _run(self, script: str, timeout: float, shell: str = "sh"):
-        return self.ctx.backend.remote.run(self.ip, script, key=self.key_path, known_hosts=self.known_hosts,
+    def _run(self, script: str, timeout: float, shell: str = "sh", key=None):
+        return self.ctx.backend.remote.run(self.ip, script, key=key or self.key_path, known_hosts=self.known_hosts,
                                            timeout=timeout, shell=shell, user=self.ssh_user)
 
     def _next_stage(self, user: str) -> None:
@@ -162,6 +183,7 @@ class BaseBuildOp(Operation):
         self._wait_ssh(f"Connexion SSH à {self._server_label()}…", self._cfg("build_ssh_timeout_s"))
         self._install()
         self._wait_rdp()
+        self._after_rdp()
         srv = backend.get_server(self.server_id)
         if srv is None:
             raise UserError("Le serveur de construction a disparu", code="build_server_lost")
@@ -176,7 +198,7 @@ class BaseBuildOp(Operation):
         img = backend.get_image(self.image_id)
         size = img.image_size if img else None
         self.result = {"image_id": self.image_id, "admin_account": p.admin_account, "os": self.os_name,
-                       "image_size": size, **self._result_extra()}
+                       "image_size": size, **self._apps_result(), **self._result_extra()}
         self.followup = "build_done"
         self.success_message = self._success_message(size)
 
@@ -206,6 +228,7 @@ class BaseBuildOp(Operation):
                 except Exception:  # noqa: BLE001
                     pass
         self.pubkey = backend.remote.keypair(self.key_path)
+        self.admin_pubkey = backend.remote.admin_keypair(ADMIN_KEY_PATH)
         self.ssh_key_id = backend.create_ssh_key(f"{BUILD_PREFIX}{self.slug}-{self.stamp}", self.pubkey,
                                                  self._labels())
 
@@ -443,6 +466,69 @@ class BuildOp(BaseBuildOp):
         p = self.params
         return {"edition": p.edition, "language": p.language, "keyboard": p.keyboard, "timezone": p.timezone}
 
+    def _after_rdp(self) -> None:
+        """Windows répond en RDP : accès d'administration (OpenSSH, clé de l'application), fin du post-install,
+        puis logiciels choisis (tâche planifiée sous le compte administrateur, suivie par ses jalons)."""
+        self._next_stage(self.params.admin_account)
+        if not self._wait_admin_ssh():
+            if self.params.apps:
+                self.apps_failed = software_catalog.resolve(self.params.apps, OS_WINDOWS)
+            return
+        self.admin_ok = True
+        self._install_apps()
+
+    def _admin_run(self, script: str, timeout: float):
+        return self._run(script, timeout, shell="powershell", key=ADMIN_KEY_PATH)
+
+    def _wait_admin_ssh(self) -> bool:
+        self.set_phase("Accès d'administration (OpenSSH)…", 97, cancellable=True)
+        deadline = time.monotonic() + self._cfg("admin_ssh_timeout_s") + self._cfg("build_settle_s")
+        r = None
+        while True:
+            r = self._admin_run(PING, 30)
+            if r.ok and "RDPM_PONG" in r.out:
+                break
+            if time.monotonic() > deadline:
+                self.log("Accès d'administration indisponible (OpenSSH ne répond pas) : pas de logiciels, et pas "
+                         f"d'installation depuis l'application pour ce bureau. {self._tail(r, 2)}", "warning")
+                return False
+            self.sleep(10)
+        self.set_phase("Fin des réglages de premier démarrage…", 98, cancellable=True)
+        deadline = time.monotonic() + 600
+        while True:
+            r = self._admin_run(POSTINSTALL_DONE, 30)
+            if r.ok and "RDPM_POSTINSTALL_DONE" in r.out:
+                return True
+            if time.monotonic() > deadline:
+                self.log("Les réglages de premier démarrage ne sont pas terminés : on continue", "warning")
+                return True
+            self.sleep(10)
+
+    def _install_apps(self) -> None:
+        keys = software_catalog.resolve(self.params.apps, OS_WINDOWS)
+        self.set_phase("Logiciels : préparation…", 0, cancellable=True)
+        r = self._admin_run(win_apps.apps_start(keys, self.password), 300)
+        if not r.ok or "RDPM_STARTED" not in r.out:
+            self.apps_failed = keys
+            self.log(f"Installation des logiciels impossible : {self._tail(r)}", "warning")
+            return
+        try:
+            prog = follow_apps(self, lambda: self._admin_run(win_apps.APPS_STATUS, 60),
+                               timeout_s=self._cfg("apps_install_timeout_s"))
+        except UserError as exc:
+            self.apps_failed = keys
+            self.log(f"Logiciels : {exc}", "warning")
+            self._admin_run(win_apps.APPS_STOP, 60)
+            return
+        self._admin_run(win_apps.APPS_CLEANUP, 60)
+        self.apps_ok = [k for k in keys if k in prog.ok]
+        self.apps_failed = [k for k in keys if k not in prog.ok]
+        if self.apps_failed:
+            self.log(f"Logiciels non installés : {', '.join(software_catalog.names(self.apps_failed))} (réessaie "
+                     "depuis « Logiciels… » une fois le bureau lancé)", "warning")
+        elif keys:
+            self.log(f"Logiciels installés : {', '.join(software_catalog.names(self.apps_ok))}")
+
     def _success_message(self, size: float | None) -> str:
         return f"« {self.name} » : Windows de référence créé ({fmt.gb(size)}) — prêt à lancer"
 
@@ -525,7 +611,8 @@ class BuildOp(BaseBuildOp):
     def _customize_image(self) -> None:
         p = self.params
         self.set_phase("Personnalisation de l'image (clavier, fuseau, réglages)…", 95, cancellable=True)
-        script = alpine_hook(self.image_name, render_postinstall_ps1(p.timezone, self._eval_rearm_days()),
+        script = alpine_hook(self.image_name, render_postinstall_ps1(p.timezone, self._eval_rearm_days(),
+                                                                     self.admin_pubkey),
                              render_locale_xml(p.keyboard, catalog.default_keyboard(p.language)))
         r = self._run(script, 300)
         if not r.ok or "RDPM_HOOKED" not in r.out:

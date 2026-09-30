@@ -3,9 +3,12 @@
 Sert au mode --fake (UI sans frais, temps accéléré) et aux tests. Les pannes injectables
 (`fail`) permettent d'exercer tous les chemins d'erreur :
   snapshot, shutdown_timeout, resource_unavailable, delete, probe, change_type,
-  build_ssh_timeout, build_prepare, build_image_name, build_install_error, build_rdp_never.
+  build_ssh_timeout, build_prepare, build_image_name, build_install_error, build_rdp_never,
+  linux_install_error, linux_unit_killed, linux_rdp_never, apps_one_fails, apps_unit_killed,
+  admin_ssh_refused.
 
-`FakeRemote` simule le SSH du serveur de construction (Ubuntu → Alpine → Windows) pour BuildOp.
+`FakeRemote` simule le SSH du serveur de construction (Ubuntu → Alpine → Windows) pour BuildOp, et l'accès
+d'administration d'un bureau (clé de l'application, port 22 ouvert à ton IP) pour les logiciels.
 """
 
 from __future__ import annotations
@@ -22,7 +25,9 @@ from pathlib import Path
 from hcloud import APIException
 
 from ..build.scripts import tag_of
+from ..constants import ADMIN_KEY_PATH, L_ADMIN, L_APPS
 from ..remote import RemoteResult
+from ..software import catalog as apps_catalog
 
 SEED_PATH = Path(__file__).with_name("static_seed.json")
 SYSTEM_IMAGES = {
@@ -103,6 +108,7 @@ class FakeCloud:
         self.public_ip_value = "198.51.100.23"
         self.requests: list[tuple[str, str, dict | None]] = []
         self.builds: dict[int, dict] = {}   # serveur de construction → état simulé (voir FakeRemote)
+        self.admin: dict[int, dict] = {}    # bureau → logiciels installés et installation en cours
         self.remote = FakeRemote(self)
         self._seed_account()
         if seed == "demo":
@@ -518,6 +524,16 @@ class FakeCloud:
             actions.append(self._public(self._action("apply_firewall", [(fw["id"], "firewall")])))
         return {"actions": actions}
 
+    def _firewall_remove_from_resources(self, fw: dict, body: dict) -> dict:
+        actions = []
+        for target in body.get("remove_from") or []:
+            sid = target["server"]["id"]
+            srv = self._find(self.servers, sid, "server")
+            fw["applied_to"] = [a for a in fw["applied_to"] if a["server"]["id"] != sid]
+            srv["public_net"]["firewalls"] = [f for f in srv["public_net"]["firewalls"] if f["id"] != fw["id"]]
+            actions.append(self._public(self._action("remove_firewall", [(fw["id"], "firewall")])))
+        return {"actions": actions}
+
     # --- IP primaires ----------------------------------------------------------------------
     def _create_primary_ip(self, body: dict) -> dict:
         ip = self._new_primary_ip(body["location"], bool(body.get("auto_delete")), body.get("labels"),
@@ -618,14 +634,16 @@ _STEP_IMAGES, _STEP_INSTALL_WIM = 4, 10
 
 # Installation d'un bureau Linux (secondes simulées après linux-prepare, jalons du journal).
 LINUX_TIMELINE: list[tuple[int, str]] = [
-    (5, "RDPM-STEP 1/6 Mise à jour du système"),
-    (40, "RDPM-STEP 2/6 Bureau XFCE, son et Firefox"),
-    (100, "RDPM-STEP 3/6 Langue, clavier et fuseau horaire"),
-    (110, "RDPM-STEP 4/6 Compilation d'xrdp avec H.264 (quelques minutes)"),
-    (230, "RDPM-STEP 5/6 Configuration du bureau distant"),
-    (240, "RDPM-STEP 6/6 Vérifications"),
-    (245, "RDPM-DONE"),
+    (5, "RDPM-STEP 1/7 Mise à jour du système"),
+    (40, "RDPM-STEP 2/7 Bureau XFCE, son et Firefox"),
+    (100, "RDPM-STEP 3/7 Langue, clavier et fuseau horaire"),
+    (110, "RDPM-STEP 4/7 Compilation d'xrdp avec H.264 (quelques minutes)"),
+    (230, "RDPM-STEP 5/7 Configuration du bureau distant"),
+    (240, "RDPM-STEP 6/7 Vérifications"),
+    (245, "RDPM-STEP 7/7 Logiciels"),
 ]
+APP_SECONDS = 20        # durée simulée de l'installation d'un logiciel
+ADMIN_BOOT_S = 30       # OpenSSH répond ce délai (simulé) après que Windows répond en RDP
 LINUX_STAGES = ("linux-installing", "linux-done")
 FAKE_CERT = "3A1F9C0D5E7B2468ACE013579BDF2468ACE01357"
 
@@ -634,10 +652,15 @@ class FakeRemote:
     """Machine à états d'un serveur de construction : ubuntu → prepared → rebooting → alpine → hold →
     hooked → windows. Reconnaît les scripts à leur étiquette `# rdpm:<tag>`."""
 
+    simulated = True
+
     def __init__(self, cloud: FakeCloud) -> None:
         self.cloud = cloud
         self.calls: list[tuple[str, int]] = []
         self.public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE rdpm-build"
+        self.admin_public_key = ("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIADMINADMINADMINADMINADMINADMINADMINADMINAD "
+                                 "cloud-desktop-manager-admin")
+        self.scripts: list[tuple[str, str]] = []   # (étiquette, script) de l'accès d'administration
 
     # --- clés et réseau (rien n'est écrit sur le disque) ------------------------------------
     def available(self) -> bool:
@@ -645,6 +668,9 @@ class FakeRemote:
 
     def keypair(self, path: Path) -> str:
         return self.public_key
+
+    def admin_keypair(self, path: Path) -> str:
+        return self.admin_public_key
 
     def forget_keypair(self, path: Path) -> None:
         pass
@@ -664,6 +690,8 @@ class FakeRemote:
                         if (s["public_net"]["ipv4"] or {}).get("ip") == host), None)
             if srv is None or srv["status"] != "running":
                 return RemoteResult(255, "", f"ssh: connect to host {host}: No route to host")
+            if key is not None and Path(key).name == ADMIN_KEY_PATH.name:
+                return self._admin_run(srv, tag, script, shell, user, host)
             b = self.cloud.builds.get(srv["id"])
             if (b is None or b["stage"] in ("nokey", "rebooting", "windows") or b["boot"] is None
                     or "build_ssh_timeout" in self.cloud.fail
@@ -679,6 +707,117 @@ class FakeRemote:
             if handler is None:
                 return RemoteResult(127, "", f"script inconnu : {tag}")
             return handler(srv, b, script)
+
+    # --- accès d'administration (clé de l'application) ---------------------------------------------
+    def _admin_state(self, srv: dict) -> dict | None:
+        """Bureau joignable avec la clé d'administration ? Windows en construction (post-install avec la
+        clé, RDP depuis ADMIN_BOOT_S) ou bureau lancé (label rdpm-admin=1 et port 22 ouvert à ton IP)."""
+        sid = srv["id"]
+        b = self.cloud.builds.get(sid)
+        if b is not None:
+            if b["stage"] != "windows" or self.admin_public_key not in (b.get("hooked") or ""):
+                return None
+            if self.cloud.sim() - self.cloud.boot_at.get(sid, float("inf")) < BOOT_TO_RDP_S + ADMIN_BOOT_S:
+                return None
+            return self.cloud.admin.setdefault(sid, {"installed": set(), "marks": [], "unit": "unknown",
+                                                     "os": "windows"})
+        if srv["labels"].get(L_ADMIN) != "1" or not self._port22_open(srv):
+            return None
+        if self.cloud.sim() - self.cloud.boot_at.get(sid, float("inf")) < BOOT_TO_RDP_S:
+            return None
+        return self.cloud.admin.setdefault(sid, {"installed": apps_catalog.decode(srv["labels"].get(L_APPS)),
+                                                 "marks": [], "unit": "unknown",
+                                                 "os": srv["labels"].get("rdpm-os", "windows")})
+
+    def _port22_open(self, srv: dict) -> bool:
+        me = self.cloud.public_ip_value
+        for ref in srv["public_net"]["firewalls"]:
+            fw = self.cloud.firewalls.get(ref["id"])
+            for rule in (fw or {}).get("rules", []):
+                if rule.get("port") == "22" and any(src.split("/")[0] == me for src in rule.get("source_ips", [])):
+                    return True
+        return False
+
+    def _admin_run(self, srv: dict, tag: str, script: str, shell: str, user: str, host: str) -> RemoteResult:
+        st = self._admin_state(srv)
+        if st is None:
+            return RemoteResult(255, "", f"ssh: connect to host {host}: Connection timed out")
+        windows = st["os"] == "windows"
+        if "admin_ssh_refused" in self.cloud.fail or (windows and (shell != "powershell" or user == "root")) \
+                or (not windows and user != "root"):
+            return RemoteResult(255, "", f"{user}@{host}: Permission denied (publickey).")
+        self.calls.append((tag, srv["id"]))
+        self.scripts.append((tag, script))
+        name = tag.replace("win-", "").replace("-", "_")
+        handler = getattr(self, f"_admin_{name}", None)
+        if handler is None:
+            return RemoteResult(127, "", f"script inconnu : {tag}")
+        return handler(srv, st, script)
+
+    def _admin_ping(self, srv: dict, st: dict, script: str) -> RemoteResult:
+        return RemoteResult(0, "RDPM_PONG\n", "")
+
+    def _admin_postinstall_status(self, srv: dict, st: dict, script: str) -> RemoteResult:
+        return RemoteResult(0, "RDPM_POSTINSTALL_DONE\n", "")
+
+    def _admin_apps_inventory(self, srv: dict, st: dict, script: str) -> RemoteResult:
+        keys = [k for k in apps_catalog.install_order() if k in st["installed"]]
+        return RemoteResult(0, "RDPM-APPS-STATUS " + " ".join(keys) + "\n", "")
+
+    def _admin_apps_start(self, srv: dict, st: dict, script: str) -> RemoteResult:
+        if st["unit"] == "active":
+            return RemoteResult(0, "RDPM_BUSY\n", "")
+        m = re.search(r"-Mode (\w+)(?: -Keys ([\w,]+))?", script) if st["os"] == "windows" else \
+            re.search(r"rdpm-apps (install|update) ?([^\n]*)$", script, re.M)
+        mode = m.group(1) if m else "install"
+        raw = (m.group(2) or "") if m else ""
+        keys = [k.strip("'") for k in re.split(r"[,\s]+", raw) if k.strip("'")]
+        st.update(unit="active", marks=[], mode=mode, keys=keys)
+        sid = srv["id"]
+        if mode == "update":
+            self.cloud._at(APP_SECONDS, lambda: self._admin_mark(sid, "RDPM-APPS-DONE update", done=True))
+            return RemoteResult(0, "RDPM_STARTED\n", "")
+        keys = apps_catalog.resolve(keys, st["os"])
+        for i, key in enumerate(keys):
+            self.cloud._at(APP_SECONDS * i + 1, lambda i=i, k=key, n=len(keys): self._admin_mark(
+                sid, f"RDPM-APP start {i + 1}/{n} {k} {apps_catalog.APPS_BY_KEY[k].name}"))
+            self.cloud._at(APP_SECONDS * (i + 1), lambda k=key: self._admin_finish(sid, k))
+        self.cloud._at(APP_SECONDS * len(keys) + 2, lambda: self._admin_mark(sid, "RDPM-APPS-DONE", done=True))
+        return RemoteResult(0, "RDPM_STARTED\n", "")
+
+    def _admin_finish(self, sid: int, key: str) -> None:
+        st = self.cloud.admin.get(sid)
+        if st is None or st["unit"] != "active":
+            return
+        if "apps_unit_killed" in self.cloud.fail:
+            st["unit"] = "inactive"
+            return
+        failing = "apps_one_fails" in self.cloud.fail and key == apps_catalog.resolve(st["keys"], st["os"])[-1]
+        if failing:
+            st["marks"].append(f"RDPM-APP fail {key} (code 1)")
+        else:
+            st["installed"].add(key)
+            st["marks"].append(f"RDPM-APP ok {key}")
+
+    def _admin_mark(self, sid: int, mark: str, done: bool = False) -> None:
+        st = self.cloud.admin.get(sid)
+        if st is None or st["unit"] != "active":
+            return
+        st["marks"].append(mark)
+        if done:
+            st["unit"] = "inactive"
+
+    def _admin_apps_status(self, srv: dict, st: dict, script: str) -> RemoteResult:
+        marks = "\n".join(st["marks"])
+        return RemoteResult(0, f"RDPM_UNIT {st['unit']}\nRDPM_MARKS_BEGIN\n{marks}\nRDPM_TAIL_BEGIN\n"
+                               f"{st['marks'][-1] if st['marks'] else ''}\n", "")
+
+    def _admin_apps_stop(self, srv: dict, st: dict, script: str) -> RemoteResult:
+        st["unit"] = "inactive"
+        return RemoteResult(0, "RDPM_STOPPED\n", "")
+
+    def _admin_apps_cleanup(self, srv: dict, st: dict, script: str) -> RemoteResult:
+        return RemoteResult(0, "RDPM_CLEANED\n", "")
 
     def _do_ping(self, srv: dict, b: dict, script: str) -> RemoteResult:
         return RemoteResult(0, "RDPM_PONG\n", "")
@@ -767,7 +906,28 @@ class FakeRemote:
         sid = srv["id"]
         for delay, mark in LINUX_TIMELINE:
             self.cloud._at(delay, lambda m=mark: self._linux_mark(sid, m))
+        keys = self._install_apps_of(script)
+        t0 = LINUX_TIMELINE[-1][0]
+        for i, key in enumerate(keys):
+            name = apps_catalog.APPS_BY_KEY[key].name
+            self.cloud._at(t0 + APP_SECONDS * i + 1,
+                           lambda m=f"RDPM-APP start {i + 1}/{len(keys)} {key} {name}": self._linux_mark(sid, m))
+            fails = "apps_one_fails" in self.cloud.fail and i == len(keys) - 1
+            self.cloud._at(t0 + APP_SECONDS * (i + 1),
+                           lambda m=f"RDPM-APP {'fail' if fails else 'ok'} {key}": self._linux_mark(sid, m))
+        self.cloud._at(t0 + APP_SECONDS * len(keys) + 2, lambda: self._linux_mark(sid, "RDPM-DONE"))
         return RemoteResult(0, "RDPM_STARTED\n", "")
+
+    @staticmethod
+    def _install_apps_of(prepare_script: str) -> list[str]:
+        """Logiciels demandés au script d'installation (transmis en base64 dans linux-prepare)."""
+        import base64
+        m = re.search(r"^echo (\S+) \| base64 -d > /root/rdpm-install\.sh$", prepare_script, re.M)
+        if not m:
+            return []
+        install = base64.b64decode(m.group(1)).decode("utf-8")
+        line = re.search(r"^rdpm-apps install (.*?) \|\| true$", install, re.M)
+        return [k.strip("'") for k in (line.group(1).split() if line else [])]
 
     def _linux_mark(self, sid: int, mark: str) -> None:
         b = self.cloud.builds.get(sid)
@@ -800,7 +960,9 @@ class FakeRemote:
         b["stage"], b["finalize_script"] = "linux-finalized", script
         self.cloud.boot_at[srv["id"]] = float("inf") if "linux_rdp_never" in self.cloud.fail \
             else self.cloud.sim() - BOOT_TO_RDP_S
-        return RemoteResult(0, f"RDPM_SESSION 1\nRDPM_CERT {FAKE_CERT}\nRDPM_XRDP 0.10.6.1\nRDPM_FINALIZED\n", "")
+        admin = "RDPM_ADMIN 1\n" if self.admin_public_key in script else ""
+        return RemoteResult(0, f"RDPM_SESSION 1\nRDPM_CERT {FAKE_CERT}\nRDPM_XRDP 0.10.6.1\n{admin}"
+                               "RDPM_FINALIZED\n", "")
 
     def _do_alpine_hook(self, srv: dict, b: dict, script: str) -> RemoteResult:
         if b["stage"] != "hold":

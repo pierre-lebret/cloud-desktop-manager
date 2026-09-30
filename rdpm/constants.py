@@ -15,6 +15,9 @@ CONFIG_PATH = APP_DIR / "config.json"
 SESSIONS_PATH = APP_DIR / "sessions.jsonl"
 STATIC_CACHE_PATH = APP_DIR / "static_cache.json"
 BUILD_DIR = APP_DIR / "build"  # clés SSH éphémères des constructions en cours
+# Clé d'administration des bureaux (installation de logiciels depuis l'application) : créée une fois,
+# posée sur chaque bureau construit ; le port SSH n'est ouvert, à ton IP, que le temps d'une opération.
+ADMIN_KEY_PATH = APP_DIR / "keys" / "admin_ed25519"
 
 KEYRING_SERVICE = APP_NAME
 KEYRING_TOKEN_USER = "api-token"
@@ -37,6 +40,9 @@ L_DISTRO = "rdpm-distro"  # distribution d'un bureau Linux (ubuntu-26.04, debian
 L_XRDP = "rdpm-xrdp"      # version d'xrdp compilée dans un bureau Linux
 L_CERT = "rdpm-cert"      # empreinte SHA-1 du certificat RDP, préenregistrée auprès de mstsc
 OS_LABELS = (L_OS, L_DISTRO, L_XRDP, L_CERT)
+L_APPS = "rdpm-apps"      # logiciels du catalogue installés (masque hexadécimal, voir software/catalog.py)
+L_ADMIN = "rdpm-admin"    # « 1 » : la clé d'administration de l'application est posée sur le bureau
+SOFTWARE_LABELS = (L_APPS, L_ADMIN)
 
 OP_LABELS = (L_OP, L_OP_TS, L_OP_HOST, L_OP_IMAGE)
 
@@ -47,7 +53,7 @@ L_EVAL_REARMS = "rdpm-eval-rearms"
 L_EVAL_AUTO = "rdpm-eval-auto"
 EVAL_LABELS = (L_EVAL_EXP, L_EVAL_REARMS, L_EVAL_AUTO)
 # Labels qui suivent un bureau de snapshot en serveur puis en snapshot (lancement, sauvegarde, duplication).
-CARRIED_LABELS = EVAL_LABELS + OS_LABELS
+CARRIED_LABELS = EVAL_LABELS + OS_LABELS + SOFTWARE_LABELS
 EVAL_PERIOD_DAYS = 180
 EVAL_ALERT_DAYS = 15     # alerte sur la carte et seuil de la prolongation automatique
 
@@ -90,6 +96,9 @@ DEFAULT_SETTINGS = {
     "build_shutdown_timeout_s": 600,
     "build_linux_timeout_s": 3600,
     "build_linux_shutdown_timeout_s": 180,
+    # Logiciels (construction et installation depuis l'application)
+    "apps_install_timeout_s": 3600,
+    "admin_ssh_timeout_s": 240,
 }
 
 REFRESH_IDLE_S = 30
