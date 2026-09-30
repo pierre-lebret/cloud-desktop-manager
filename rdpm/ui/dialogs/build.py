@@ -9,9 +9,9 @@ from datetime import date
 import customtkinter as ctk
 
 from ... import fmt, license, netutil
-from ...build import catalog
+from ...build import catalog, linux
 from ...build.scripts import render_eval_task_install
-from ...constants import EVAL_ALERT_DAYS
+from ...constants import EVAL_ALERT_DAYS, OS_LINUX
 from ...labels import slugify
 from ...models import Offer
 from ...offers import compatible_offers
@@ -35,25 +35,34 @@ def _menu(master, values: list[str], command=None, width: int | None = None) -> 
 
 
 class BuildDialog(Modal):
+    """Formulaire de construction d'un bureau de référence ; Windows ici, Linux dans build_linux.py."""
+
+    WINDOW_TITLE = "Créer un Windows de référence"
+    SUBTITLE = ("Windows est installé automatiquement sur un serveur temporaire (aucun clic dans l'installeur), "
+                "puis sauvegardé en snapshot : environ 30 à 40 minutes.")
+    DEFAULT_NAME = "Windows de référence"
+    SUBMIT_TEXT = "Créer le Windows"
+    MIN_DISK = MIN_DISK_GB
+    SNAPSHOT_GB = SNAPSHOT_GB_ESTIMATE
+    DURATION_TEXT = "30 à 40 min de construction"
+
     def __init__(self, app) -> None:
         self.app, self.ctrl = app, app.controller
         self.static = self.ctrl.static
-        super().__init__(app, "Créer un Windows de référence", width=1000)
+        super().__init__(app, self.WINDOW_TITLE, width=1000)
         if self.static is None:
-            self.heading("Créer un Windows de référence")
+            self.heading(self.WINDOW_TITLE)
             self.notice("Catalogue du fournisseur en cours de chargement : réessaie dans un instant.", "info")
             self.buttons(("Fermer", self.cancel, "secondary"))
             return
-        self.heading("Créer un Windows de référence",
-                     "Windows est installé automatiquement sur un serveur temporaire (aucun clic dans l'installeur), "
-                     "puis sauvegardé en snapshot : environ 30 à 40 minutes.")
+        self.heading(self.WINDOW_TITLE, self.SUBTITLE)
         self.locations = ordered_locations(self.static)
         self.city_to_loc = {city_label(self.static, loc): loc for loc in self.locations}
         prefs_loc = next((p.last_location for p in self.ctrl.config.desktops.values() if p.last_location), None)
         self.loc_var = tk.StringVar(value=prefs_loc if prefs_loc in self.locations else self.locations[0])
         self.type_var = tk.StringVar(value="")
         self.pin_var = tk.BooleanVar(value=True)
-        self.name_var = tk.StringVar(value="Windows de référence")
+        self.name_var = tk.StringVar(value=self.DEFAULT_NAME)
         self.offers: list[Offer] = []
         self._kb_touched = self._tz_touched = False
         self._local_tz = catalog.local_timezone()
@@ -83,12 +92,27 @@ class BuildDialog(Modal):
         self.error = label(left, "", 12, color=t.tone("warning")[0], wraplength=600)
         self.error.pack(anchor="w")
         self.create_btn = self.buttons(("Annuler", self.cancel, "secondary"),
-                                       ("Créer le Windows", self._submit, "primary"))[1]
-        for var in (self.name_var, self.url_var, self.image_var, self.admin_var):
+                                       (self.SUBMIT_TEXT, self._submit, "primary"))[1]
+        for var in self._watched_vars():
             var.trace_add("write", lambda *_: self._update_state())
-        self._on_edition(self.edition_menu.get())
+        self._after_sections()
         self._refresh_offers()
         self._watch_ip()
+
+    # --- points d'extension (Windows ici) ---------------------------------------------------------
+    def _watched_vars(self) -> tuple:
+        return self.name_var, self.url_var, self.image_var, self.admin_var
+
+    def _after_sections(self) -> None:
+        self._on_edition(self.edition_menu.get())
+
+    def _pick_offer(self, available: list[Offer]) -> Offer | None:
+        return next((o for o in available if o.stype.memory >= RECOMMENDED_RAM_GB
+                     and o.stype.disk >= RECOMMENDED_DISK_GB), available[0] if available else None)
+
+    def _credit_text(self) -> str:
+        return ("Installation via reinstall.sh (GPLv3, github.com/bin456789/reinstall), version figée au commit "
+                f"{catalog.REINSTALL_COMMIT[:7]} et vérifiée par SHA-256 avant exécution.")
 
     # --- sections --------------------------------------------------------------------------------
     def _identity_section(self) -> None:
@@ -181,9 +205,7 @@ class BuildDialog(Modal):
         else:
             notice(self.left, "IP publique inconnue : la construction attend de la connaître pour limiter "
                               "l'accès SSH/RDP au serveur temporaire.", "warning", 420).pack(fill="x", pady=(8, 0))
-        label(self.left, "Installation via reinstall.sh (GPLv3, github.com/bin456789/reinstall), version figée "
-                         f"au commit {catalog.REINSTALL_COMMIT[:7]} et vérifiée par SHA-256 avant exécution.", 11,
-              color=t.FAINT, wraplength=440).pack(fill="x", pady=(10, 0))
+        label(self.left, self._credit_text(), 11, color=t.FAINT, wraplength=440).pack(fill="x", pady=(10, 0))
 
     # --- réactions ---------------------------------------------------------------------------------
     def _edition(self) -> catalog.Edition:
@@ -228,10 +250,9 @@ class BuildDialog(Modal):
 
     def _refresh_offers(self) -> None:
         loc = self.loc_var.get()
-        offers = compatible_offers(self.static.server_types, loc, MIN_DISK_GB, "x86")
+        offers = compatible_offers(self.static.server_types, loc, self.MIN_DISK, "x86")
         available = [o for o in offers if o.available]
-        pick = next((o for o in available if o.stype.memory >= RECOMMENDED_RAM_GB
-                     and o.stype.disk >= RECOMMENDED_DISK_GB), available[0] if available else None)
+        pick = self._pick_offer(available)
         self.offers = [replace(o, recommended=o is pick, base_type=None, disk_grows=False) for o in offers]
         if self.type_var.get() not in {o.name for o in available}:
             self.type_var.set(pick.name if pick else "")
@@ -256,11 +277,11 @@ class BuildDialog(Modal):
                                       "choix des types les moins chers.")
         pricing = self.static.pricing
         hour = offer.price_h + pricing.ipv4_h(offer.location)
-        storage = SNAPSHOT_GB_ESTIMATE * pricing.image_gb_month
+        storage = self.SNAPSHOT_GB * pricing.image_gb_month
         self.cost.configure(text=f"≈ {fmt.eur(hour)} pour la construction  ·  puis ≈ {fmt.eur_m(storage)} de stockage")
         self.cost_sub.configure(text=f"Serveur {fmt.eur_h(offer.price_h)} + IPv4 {fmt.eur_h(pricing.ipv4_h(offer.location))}, "
-                                     "1 h facturée (30 à 40 min de construction) · snapshot d'environ "
-                                     f"{SNAPSHOT_GB_ESTIMATE} Go à {fmt.eur(pricing.image_gb_month, 4)}/Go/mois")
+                                     f"1 h facturée ({self.DURATION_TEXT}) · snapshot d'environ "
+                                     f"{self.SNAPSHOT_GB} Go à {fmt.eur(pricing.image_gb_month, 4)}/Go/mois")
         self._update_state()
 
     def _check_iso(self) -> None:
@@ -314,7 +335,8 @@ class BuildDialog(Modal):
         problem = self._problem()
         self.create_btn.configure(state="normal" if problem is None else "disabled")
         self.error.configure(text=problem or "")
-        self.check_btn.configure(state="normal" if self.url_var.get().strip() else "disabled")
+        if hasattr(self, "check_btn"):
+            self.check_btn.configure(state="normal" if self.url_var.get().strip() else "disabled")
 
     def _watch_ip(self) -> None:
         """L'IP publique peut arriver après l'ouverture : le bouton s'active alors tout seul."""
@@ -340,7 +362,7 @@ class BuildDialog(Modal):
             keyboard=self.kb_labels[self.kb_menu.get()], timezone=self.tz_labels[self.tz_menu.get()],
             admin_account=admin, server_type=offer.name, location=offer.location,
             allow_cidr=netutil.normalize_cidr(ip), pin=self.pin_var.get())
-        if self.app._safe(self.ctrl.build_windows, name, params) is not None:
+        if self.app._safe(self.ctrl.build_desktop, name, params) is not None:
             self.close(params)
 
 
@@ -349,32 +371,68 @@ class BuildDoneDialog(Modal):
 
     def __init__(self, app, op) -> None:
         self.app, self.ctrl, self.op = app, app.controller, op
-        super().__init__(app, "Windows de référence prêt", width=560)
+        super().__init__(app, "Bureau de référence prêt", width=580)
         res = op.result
-        ed = catalog.EDITIONS.get(res.get("edition"))
         self.heading(f"« {op.name} » est prêt",
                      f"Snapshot de {fmt.gb(res.get('image_size'))} créé" + (" et épinglé" if op.params.pin else "")
                      + ". Le serveur temporaire a été supprimé : seul le stockage est facturé.")
+        if res.get("os") == OS_LINUX:
+            self._linux_details(res)
+        else:
+            self._windows_details(res)
+        self.launch_btn = self.buttons(("Fermer", self.cancel, "secondary"),
+                                       ("Copier le mot de passe", self._copy, "secondary"),
+                                       ("Lancer maintenant", self._launch, "primary"))[2]
+        self._poll()
+
+    def _bullets(self, lines: list[str]) -> None:
+        for line in lines:
+            label(self.body, f"•  {line}", 12, color=t.MUTED, wraplength=520).pack(fill="x", padx=(6, 0), pady=(2, 0))
+
+    def _linux_details(self, res: dict) -> None:
+        distro = linux.DISTROS.get(res.get("distro"))
+        loc = linux.LOCALES.get(res.get("locale"))
+        tz = linux.TIMEZONES.get(res.get("timezone"), res.get("timezone"))
+        self.section("Compte")
+        self.text(f"Utilisateur : {res.get('admin_account')} · mot de passe généré et enregistré dans le Gestionnaire "
+                  "d'identifiants de ce PC (connexion RDP en 1 clic). C'est aussi le mot de passe de « sudo ».",
+                  t.TEXT, 12)
+        self.section("Ton bureau Linux")
+        xrdp = f"xrdp {res['xrdp']}" if res.get("xrdp") else "xrdp"
+        self._bullets([
+            f"{distro.label.split(' (')[0] if distro else res.get('distro')} · bureau XFCE · "
+            f"{loc.label if loc else res.get('locale')} · fuseau {tz}",
+            f"Image fluide ({xrdp} avec H.264), son, presse-papiers ; la session suit la taille de la fenêtre",
+            "Le clavier suit celui de ce PC à chaque connexion ; tu retrouves ta session là où tu l'as laissée",
+            "Installer un logiciel : Terminal → sudo apt install <paquet>",
+            "Mises à jour de sécurité automatiques ; les volumes ajoutés apparaissent dans le gestionnaire de fichiers",
+        ])
+        if res.get("session_ok") is False:
+            self.notice("La session XFCE de test n'a pas pu être vérifiée pendant la construction : lance le bureau "
+                        "et connecte-toi pour contrôler.", "warning", pady=(12, 0))
+        if res.get("forced_shutdown"):
+            self.notice("Le système ne s'est pas éteint tout seul au signal d'arrêt : les sauvegardes risquent "
+                        "d'attendre l'arrêt forcé.", "warning", pady=(12, 0))
+        self.notice("Pour regarder des vidéos confortablement, lance-le sur un type à 4 vCPU ou plus.", "info",
+                    pady=(12, 0))
+
+    def _windows_details(self, res: dict) -> None:
+        ed = catalog.EDITIONS.get(res.get("edition"))
         self.section("Compte Windows")
         self.text(f"Utilisateur : {res.get('admin_account')} · mot de passe généré et enregistré dans le Gestionnaire "
                   "d'identifiants (connexion RDP en 1 clic).", t.TEXT, 12)
         self.section("Réglages déjà appliqués")
         kb = catalog.KEYBOARDS.get(res.get("keyboard"), res.get("keyboard"))
         tz = catalog.TIMEZONES.get(res.get("timezone"), res.get("timezone"))
-        for line in (f"Clavier {kb} · fuseau {tz}", "Bureau à distance activé, pilotes VirtIO installés",
-                     "Arrêt propre (bouton d'alimentation = arrêter), veille prolongée et démarrage rapide désactivés",
-                     "Gestionnaire de serveur silencieux au démarrage"):
-            label(self.body, f"•  {line}", 12, color=t.MUTED, wraplength=500).pack(fill="x", padx=(6, 0), pady=(2, 0))
+        self._bullets([f"Clavier {kb} · fuseau {tz}", "Bureau à distance activé, pilotes VirtIO installés",
+                       "Arrêt propre (bouton d'alimentation = arrêter), veille prolongée et démarrage rapide "
+                       "désactivés", "Gestionnaire de serveur silencieux au démarrage"])
         if ed and not ed.custom:
             self.notice(f"Licence d'évaluation Microsoft : {ed.eval_days} jours, prolongée automatiquement au "
                         f"démarrage quand il reste moins de {EVAL_ALERT_DAYS} jours. Le compte à rebours est "
                         "affiché sur la carte du bureau.", "info", pady=(12, 0))
         else:
             self.notice("ISO personnalisée : pense à activer Windows avec ta licence.", "info", pady=(12, 0))
-        self.launch_btn = self.buttons(("Fermer", self.cancel, "secondary"),
-                                       ("Copier le mot de passe", self._copy, "secondary"),
-                                       ("Lancer maintenant", self._launch, "primary"))[2]
-        self._poll()
 
     def _poll(self) -> None:
         if not self.winfo_exists():

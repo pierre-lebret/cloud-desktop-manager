@@ -8,7 +8,7 @@ from typing import Callable
 import customtkinter as ctk
 
 from ... import fmt, netutil
-from ...constants import L_LOC
+from ...constants import L_LOC, OS_LINUX
 from ...models import Desktop, Offer, SnapshotInfo
 from ...offers import alternatives, compatible_offers
 from ...ops.launch import LaunchParams
@@ -124,6 +124,9 @@ class LaunchDialog(Modal):
         self.section("Options", parent=self.right)
         ctk.CTkCheckBox(self.right, text="Connexion automatique dès que le bureau est prêt",
                         variable=self.auto_var, font=t.font(12)).pack(anchor="w")
+        if desktop.os == OS_LINUX:
+            label(self.right, "Bureau Linux : l'image est encodée en H.264 par le serveur. Pour la vidéo, "
+                              "choisis 4 vCPU ou plus.", 11, color=t.MUTED, wraplength=340).pack(fill="x", pady=(8, 0))
         if not self.ctrl.creds.get_password(desktop.slug) and not new_name:
             label(self.right, "Aucun mot de passe enregistré : il sera demandé à la connexion "
                               "(menu ⋯ → Identifiants RDP… pour la connexion en 1 clic).", 11, color=t.MUTED,
@@ -365,7 +368,7 @@ class LaunchDialog(Modal):
             allow_description="Mon IP",
             volume_ids=[vid for vid, var in self.volume_vars.items() if var.get()],
             primary_ip_id=self.fixed.id if self.fixed and self.fixed_var.get() else None,
-            rdp_user=self.prefs.rdp_user, auto_connect=self.auto_var.get())
+            rdp_user=self.prefs.rdp_user, auto_connect=self.auto_var.get(), os_name=self.desktop.os)
         self.ctrl.config.update_prefs(self.desktop.slug, auto_connect=self.auto_var.get())
         self.close(params)
         self.on_submit(params)

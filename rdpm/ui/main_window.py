@@ -24,6 +24,7 @@ from .desktop_card import DesktopCard
 from .icons import OS_NAMES, set_window_icon
 from .dialogs.base import ask_text, confirm, confirm_typed, info, top_window
 from .dialogs.build import BuildDialog, BuildDoneDialog, LicenseDialog
+from .dialogs.build_linux import LinuxBuildDialog
 from .dialogs.launch import LaunchDialog
 from .dialogs.manage import (
     AddVolumeDialog, ConflictDialog, CredentialsDialog, DeleteDesktopDialog, DuplicateDialog, FirewallDialog,
@@ -285,8 +286,14 @@ class MainWindow(ctk.CTk):
         self.empty_bar = ctk.CTkProgressBar(self.empty, mode="indeterminate", width=260, progress_color=t.ACCENT)
         self.empty_btn = primary_button(self.empty, "Importer un snapshot…",
                                         lambda: self.with_project(self.empty_btn, ImportChooser), width=200)
-        self.empty_build_btn = primary_button(self.empty, "Créer un Windows de référence…",
+        self.empty_build_row = ctk.CTkFrame(self.empty, fg_color="transparent")
+        self.empty_build_btn = primary_button(self.empty_build_row, "Créer un Windows de référence…",
                                               lambda: self.with_project(self.empty_build_btn, BuildDialog), width=260)
+        self.empty_build_btn.pack(side="left", padx=(0, 8))
+        self.empty_linux_btn = primary_button(self.empty_build_row, "Créer un bureau Linux…",
+                                              lambda: self.with_project(self.empty_linux_btn, LinuxBuildDialog),
+                                              width=220)
+        self.empty_linux_btn.pack(side="left")
         self.import_frame = ctk.CTkFrame(self.scroll, fg_color="transparent", height=1)
         self.import_frame.grid(row=3, column=0, sticky="ew", pady=(18, 10))
         self.scroll.bind("<Configure>", lambda _e: self._relayout())
@@ -323,7 +330,7 @@ class MainWindow(ctk.CTk):
         """Sans aucune clé API, tout ce qui parle au fournisseur reste désactivé."""
         self._locked = locked
         state = "disabled" if locked else "normal"
-        for btn in (*self.header_buttons, self.empty_btn, self.empty_build_btn):
+        for btn in (*self.header_buttons, self.empty_btn, self.empty_build_btn, self.empty_linux_btn):
             btn.configure(state=state)
         self._buttons_sig = None
         self._render()
@@ -503,7 +510,7 @@ class MainWindow(ctk.CTk):
             return
         self.empty.grid(row=2, column=0, sticky="ew")
         self.empty_btn.pack_forget()
-        self.empty_build_btn.pack_forget()
+        self.empty_build_row.pack_forget()
         if hub.locked:
             self.empty_bar.stop()
             self.empty_bar.pack_forget()
@@ -532,10 +539,10 @@ class MainWindow(ctk.CTk):
                                           "installer un système neuf (+ Nouveau bureau).")
             self.empty_btn.pack(pady=16)
         else:
-            self.empty_sub.configure(text="Aucun snapshot à importer. L'application peut installer Windows toute "
-                                          "seule sur un serveur temporaire (≈ 30–40 min) et en faire ton premier "
-                                          "bureau. Linux arrivera bientôt.")
-            self.empty_build_btn.pack(pady=16)
+            self.empty_sub.configure(text="Aucun snapshot à importer. L'application peut installer tout seule "
+                                          "Windows (≈ 30–40 min) ou un bureau Linux XFCE (≈ 15 min) sur un serveur "
+                                          "temporaire et en faire ton premier bureau.")
+            self.empty_build_row.pack(pady=16)
 
     def _render_imports(self) -> None:
         items = []

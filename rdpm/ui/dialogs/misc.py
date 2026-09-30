@@ -19,6 +19,7 @@ from ..icons import OS_NAMES, icon, icon_label, os_icon_name
 from ..widgets import bind_enabled, caption, ghost_button, label, secondary_button
 from .base import Modal, confirm, info
 from .build import BuildDialog
+from .build_linux import LinuxBuildDialog
 from .manage import LiveModal
 
 
@@ -56,34 +57,37 @@ class ImportChooser(LiveModal):
                           border_color=t.ACCENT if on else t.BORDER, text_color=t.TEXT)
 
     def render(self, parent) -> None:
-        if self.os_var.get() == OS_LINUX:
-            self._row(parent, "Installer une distribution Linux",
-                      "Bureaux Linux à la demande (Ubuntu, Debian…) : bientôt disponible.", None, "Bientôt",
-                      os_name=OS_LINUX)
-            label(parent, "L'import de snapshots et de serveurs Linux arrivera avec leur prise en charge.", 12,
-                  color=t.MUTED, wraplength=600).pack(fill="x", pady=(14, 0))
-            return
+        os_name = self.os_var.get()
         g = self.ctrl.grouping
         importing = any(isinstance(op, (AdoptSnapshotOp, AdoptServerOp)) for op in self.ctrl.runner.active())
-        self._row(parent, "Créer un Windows de référence",
-                  "Installation automatique de Windows Server (évaluation Microsoft) ou d'une ISO à toi sur un "
-                  "serveur temporaire, puis snapshot. Langue, clavier et fuseau au choix · ≈ 30–40 min.",
-                  self._build, "Créer…")
+        if os_name == OS_LINUX:
+            self._row(parent, "Créer un bureau Linux",
+                      "Ubuntu 26.04 LTS ou Debian 13 avec le bureau XFCE, installé automatiquement puis sauvegardé "
+                      "en snapshot. Connexion RDP en 1 clic, image fluide même en vidéo (H.264), son et "
+                      "presse-papiers · ≈ 15 min.", self._build_linux, "Créer…", os_name=OS_LINUX)
+        else:
+            self._row(parent, "Créer un Windows de référence",
+                      "Installation automatique de Windows Server (évaluation Microsoft) ou d'une ISO à toi sur un "
+                      "serveur temporaire, puis snapshot. Langue, clavier et fuseau au choix · ≈ 30–40 min.",
+                      self._build, "Créer…")
         if not (g.unmanaged_snapshots or g.unmanaged_servers):
             label(parent, "Rien à importer : tous les snapshots et serveurs du projet sont déjà gérés.", 12,
                   color=t.MUTED, wraplength=600).pack(fill="x", pady=(14, 0))
             return
         caption(parent, "À importer").pack(fill="x", pady=(16, 0))
+        if os_name == OS_LINUX:
+            label(parent, "Import comme bureau Linux : xrdp doit déjà y être installé (connexion RDP).", 11,
+                  color=t.MUTED, wraplength=600).pack(fill="x", pady=(2, 0))
         if importing:
             label(parent, "Importation en cours…", 12, color=t.ACCENT).pack(fill="x", pady=(4, 0))
         for snap in g.unmanaged_snapshots:
             self._row(parent, f"Snapshot « {snap.description or snap.id} »",
                       f"{fmt.gb(snap.image_size)} · disque {snap.disk_size} Go · créé le {fmt.date_long(snap.created)}"
                       + (" · protégé" if snap.protected else ""),
-                      None if importing else lambda s=snap: self._adopt(snapshot=s))
+                      None if importing else lambda s=snap: self._adopt(snapshot=s), os_name=os_name)
         for srv in g.unmanaged_servers:
             self._row(parent, f"Serveur « {srv.name} »", f"{srv.spec} · {fmt.status(srv.status)}",
-                      None if importing else lambda s=srv: self._adopt(server=s))
+                      None if importing else lambda s=srv: self._adopt(server=s), os_name=os_name)
 
     def _row(self, parent, title: str, detail: str, action, button: str = "Importer…",
              os_name: str = OS_WINDOWS) -> None:
@@ -98,23 +102,31 @@ class ImportChooser(LiveModal):
                          state="normal" if action else "disabled").grid(row=0, column=2, rowspan=2, padx=12)
 
     def _adopt(self, **kw) -> None:
+        os_name = self.os_var.get()
         self.close(None)
-        AdoptDialog(self.app, **kw)
+        AdoptDialog(self.app, os_name=os_name, **kw)
 
     def _build(self) -> None:
         self.close(None)
         BuildDialog(self.app)
 
+    def _build_linux(self) -> None:
+        self.close(None)
+        LinuxBuildDialog(self.app)
+
 
 class AdoptDialog(Modal):
-    def __init__(self, app, snapshot: SnapshotInfo | None = None, server: ServerInfo | None = None) -> None:
-        super().__init__(app, "Importer comme bureau", width=560)
-        self.app, self.snapshot, self.server = app, snapshot, server
+    def __init__(self, app, snapshot: SnapshotInfo | None = None, server: ServerInfo | None = None,
+                 os_name: str = OS_WINDOWS) -> None:
+        linux_os = os_name == OS_LINUX
+        super().__init__(app, "Importer comme bureau Linux" if linux_os else "Importer comme bureau", width=560)
+        self.app, self.snapshot, self.server, self.os_name = app, snapshot, server, os_name
         ctrl = app.controller
         default = (snapshot.created_from_name if snapshot else server.name) or "Bureau"
         default = default.replace("-", " ").strip().capitalize()
-        self.heading("Importer comme bureau",
-                     "L'application le gérera : lancement, sauvegardes, fermeture, coûts.")
+        self.heading("Importer comme bureau Linux" if linux_os else "Importer comme bureau",
+                     "L'application le gérera : lancement, sauvegardes, fermeture, coûts."
+                     + (" La connexion passe par RDP : xrdp doit déjà y être installé." if linux_os else ""))
         if snapshot and ctrl.static:
             offer = recommended_offer(ctrl.static.server_types, "nbg1", snapshot.disk_size, snapshot.architecture)
             hint = f" · le moins cher : {offer.name} à {fmt.eur_h(offer.price_h)}" if offer else ""
@@ -131,7 +143,7 @@ class AdoptDialog(Modal):
         self.section("Compte du bureau (pour la connexion en 1 clic)")
         row = ctk.CTkFrame(self.body, fg_color="transparent")
         row.pack(fill="x")
-        self.user_var = tk.StringVar(value=DEFAULT_RDP_USER)
+        self.user_var = tk.StringVar(value="" if linux_os else DEFAULT_RDP_USER)
         ctk.CTkEntry(row, textvariable=self.user_var, height=32, width=180, font=t.font(12)).pack(side="left")
         self.pw = ctk.CTkEntry(row, height=32, font=t.font(12), placeholder_text="Mot de passe (facultatif)")
         self.pw.pack(side="left", fill="x", expand=True, padx=(8, 0))
@@ -150,7 +162,9 @@ class AdoptDialog(Modal):
         self.error = label(self.body, "", 12, color=t.tone("danger")[0])
         self.error.pack(fill="x", pady=(6, 0))
         ok = self.buttons(("Annuler", self.cancel, "secondary"), ("Importer", self._ok, "primary"))[1]
-        bind_enabled(ok, lambda: bool(self.name_var.get().strip()), self.name_var)
+        # Linux : pas d'« Administrator » par défaut, l'identifiant est obligatoire.
+        bind_enabled(ok, lambda: bool(self.name_var.get().strip())
+                     and (not linux_os or bool(self.user_var.get().strip())), self.name_var, self.user_var)
 
     def _ok(self) -> None:
         name = self.name_var.get().strip()
@@ -160,9 +174,10 @@ class AdoptDialog(Modal):
         try:
             if self.snapshot:
                 ctrl.adopt_snapshot(self.snapshot, name, self.user_var.get().strip(), self.pw.get() or None,
-                                    self.pin_var.get())
+                                    self.pin_var.get(), self.os_name)
             else:
-                ctrl.adopt_server(self.server, name, self.user_var.get().strip(), self.pw.get() or None)
+                ctrl.adopt_server(self.server, name, self.user_var.get().strip(), self.pw.get() or None,
+                                  self.os_name)
         except UserError as exc:
             self.error.configure(text=str(exc))
             return
