@@ -5,7 +5,7 @@ from pathlib import Path
 
 # APP_NAME fixe le dossier %APPDATA% et le service du Gestionnaire d'identifiants : ne pas le changer
 # (les préférences, mots de passe et clés API existants y sont rangés).
-APP_NAME = "HetznerRDP"
+APP_NAME = "cloud-desktop-manager"
 APP_TITLE = "Cloud Desktop Manager"
 
 APP_DIR = Path(os.environ.get("APPDATA") or Path.home()) / APP_NAME

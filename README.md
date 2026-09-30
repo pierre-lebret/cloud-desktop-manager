@@ -41,7 +41,7 @@ projet. L'application affiche **tous les projets ensemble** : cartes, coûts add
 
 | Commande | Effet |
 |---|---|
-| double-clic sur `HetznerRDP.pyw` | ouvre l'application sans console |
+| double-clic sur `app.pyw` | ouvre l'application sans console |
 | `python app.py` | ouvre l'application sur le vrai compte |
 | `python app.py --readonly` | lit le vrai compte sans jamais rien modifier |
 | `python app.py --fake` | simulation complète (temps accéléré, aucun appel au fournisseur) |
@@ -98,7 +98,7 @@ charge) — 36 min au total pour un Windows Server 2025 de 5,3 Go.
 - **Disque** : le snapshot aura le disque du type choisi pour la construction. Plus il est petit, plus tu gardes le
   choix des types les moins chers au lancement.
 - **Sécurité** : reinstall.sh est figé à un commit précis et vérifié par SHA-256 avant d'être exécuté ; la clé SSH est
-  éphémère (`%APPDATA%\HetznerRDP\build\`), supprimée avec le pare-feu et le serveur temporaires. Le mot de passe
+  éphémère (`%APPDATA%\cloud-desktop-manager\build\`), supprimée avec le pare-feu et le serveur temporaires. Le mot de passe
   n'apparaît ni dans les journaux ni sur une ligne de commande locale.
 - **En cas d'échec**, l'application propose de supprimer le serveur temporaire (par défaut, au bout de 2 minutes) ou de
   le conserver pour diagnostic (journal de l'installeur sur `http://<ip>/`, RDP avec le compte administrateur). Un
@@ -151,7 +151,7 @@ Plusieurs bureaux peuvent tourner en même temps ; chaque carte suit son propre 
 
 ## Fichiers locaux
 
-`%APPDATA%\HetznerRDP\` (nom historique, conservé pour garder préférences et clés existantes) contient :
+`%APPDATA%\cloud-desktop-manager\` (nom historique, conservé pour garder préférences et clés existantes) contient :
 
 - `config.json` : préférences ;
 - `sessions.jsonl` : historique des coûts ;

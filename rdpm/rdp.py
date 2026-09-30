@@ -1,6 +1,6 @@
 """Connexion RDP en 1 clic : mot de passe dans le Gestionnaire d'identifiants Windows.
 
-- Mot de passe du bureau : keyring (service HetznerRDP, compte « desktop:<slug> »).
+- Mot de passe du bureau : keyring (service cloud-desktop-manager, compte « desktop:<slug> »).
 - Au lancement : identifiant générique TERMSRV/<ip> écrit via CredWriteW (pas de mot de passe
   sur une ligne de commande), lu automatiquement par mstsc.
 - À la fermeture du serveur : l'identifiant TERMSRV/<ip> est supprimé, car Hetzner peut réattribuer
