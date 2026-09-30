@@ -9,6 +9,7 @@ import customtkinter as ctk
 
 from ... import netutil
 from ...build import linux
+from ...constants import OS_LINUX
 from ...models import Offer
 from ...ops.build_linux import LinuxBuildParams
 from .. import theme as t
@@ -26,6 +27,7 @@ class LinuxBuildDialog(BuildDialog):
     MIN_DISK = linux.MIN_DISK_GB
     SNAPSHOT_GB = 5
     DURATION_TEXT = "10 à 20 min de construction"
+    OS_NAME = OS_LINUX
 
     # --- points d'extension ------------------------------------------------------------------------
     def _watched_vars(self) -> tuple:
@@ -123,6 +125,7 @@ class LinuxBuildDialog(BuildDialog):
         params = LinuxBuildParams(
             distro=self._distro(), username=self.user_var.get().strip(), locale=self._locale(),
             timezone=self.tz_labels[self.tz_menu.get()], server_type=offer.name, location=offer.location,
-            allow_cidr=netutil.normalize_cidr(self.ctrl.public_ip), pin=self.pin_var.get())
+            allow_cidr=netutil.normalize_cidr(self.ctrl.public_ip), pin=self.pin_var.get(),
+            apps=tuple(self.picker.requested()))
         if self.app._safe(self.ctrl.build_desktop, self.name_var.get().strip(), params) is not None:
             self.close(params)

@@ -11,13 +11,15 @@ import customtkinter as ctk
 from ... import fmt, license, netutil
 from ...build import catalog, linux
 from ...build.scripts import render_eval_task_install
-from ...constants import EVAL_ALERT_DAYS, OS_LINUX
+from ...constants import EVAL_ALERT_DAYS, OS_LINUX, OS_WINDOWS
 from ...labels import slugify
 from ...models import Offer
 from ...offers import compatible_offers
 from ...ops.build import BuildParams
+from ...software import catalog as software_catalog
 from ...state import Act
 from .. import theme as t
+from ..software import SoftwarePicker
 from ..widgets import label, notice
 from .base import Modal
 from .launch import OfferList, city_label, ordered_locations
@@ -45,6 +47,7 @@ class BuildDialog(Modal):
     MIN_DISK = MIN_DISK_GB
     SNAPSHOT_GB = SNAPSHOT_GB_ESTIMATE
     DURATION_TEXT = "30 à 40 min de construction"
+    OS_NAME = OS_WINDOWS
 
     def __init__(self, app) -> None:
         self.app, self.ctrl = app, app.controller
@@ -78,10 +81,11 @@ class BuildDialog(Modal):
         self.right.grid(row=0, column=1, sticky="nsew", padx=(14, 0))
         self._identity_section()
         self._edition_section()
-        self._options_section()
+        self._software_section()
         self._location_section()
         self._type_section()
         self._locale_section()
+        self._options_section()
 
         left = ctk.CTkFrame(self.footer, fg_color="transparent")
         left.pack(side="left", fill="x", expand=True)
@@ -152,6 +156,18 @@ class BuildDialog(Modal):
                                                                                                   pady=(4, 0))
         ctk.CTkEntry(self.custom, textvariable=self.admin_var, height=30, font=t.font(12), width=220).pack(anchor="w")
 
+    def _software_section(self) -> None:
+        self.section("Logiciels prêts à l'emploi", parent=self.left)
+        self.picker = SoftwarePicker(self.left, self.OS_NAME, on_change=self._on_offer, height=250, wraplength=460)
+        self.picker.pack(fill="both", expand=True)
+
+    def _snapshot_gb(self) -> float:
+        return self.SNAPSHOT_GB + software_catalog.estimate(self.picker.selected(), self.OS_NAME)[1]
+
+    def _duration_text(self) -> str:
+        minutes = software_catalog.estimate(self.picker.selected(), self.OS_NAME)[0]
+        return self.DURATION_TEXT + (f", + ~{max(1, round(minutes))} min de logiciels" if minutes else "")
+
     def _locale_section(self) -> None:
         self.section("Langue, clavier, fuseau horaire", parent=self.right)
         grid = ctk.CTkFrame(self.right, fg_color="transparent")
@@ -194,18 +210,18 @@ class BuildDialog(Modal):
         self.disk_note.pack(fill="x", pady=(6, 0))
 
     def _options_section(self) -> None:
-        self.section("Options", parent=self.left)
-        ctk.CTkCheckBox(self.left, text="Épingler le snapshot comme « version d'origine » (jamais supprimé "
-                                        "par la rétention)", variable=self.pin_var, font=t.font(12)).pack(anchor="w")
+        self.section("Options", parent=self.right)
+        ctk.CTkCheckBox(self.right, text="Épingler le snapshot comme « version d'origine » (jamais supprimé "
+                                         "par la rétention)", variable=self.pin_var, font=t.font(12)).pack(anchor="w")
         ip = self.ctrl.public_ip
         if ip:
-            label(self.left, f"✓  SSH et RDP limités à ton IP {ip} pendant la construction (pare-feu temporaire, "
-                             "clé SSH éphémère).", 12, color=t.tone("success")[0], wraplength=440).pack(
+            label(self.right, f"✓  SSH et RDP limités à ton IP {ip} pendant la construction (pare-feu temporaire, "
+                              "clé SSH éphémère).", 12, color=t.tone("success")[0], wraplength=440).pack(
                 anchor="w", pady=(8, 0))
         else:
-            notice(self.left, "IP publique inconnue : la construction attend de la connaître pour limiter "
-                              "l'accès SSH/RDP au serveur temporaire.", "warning", 420).pack(fill="x", pady=(8, 0))
-        label(self.left, self._credit_text(), 11, color=t.FAINT, wraplength=440).pack(fill="x", pady=(10, 0))
+            notice(self.right, "IP publique inconnue : la construction attend de la connaître pour limiter "
+                               "l'accès SSH/RDP au serveur temporaire.", "warning", 420).pack(fill="x", pady=(8, 0))
+        label(self.right, self._credit_text(), 11, color=t.FAINT, wraplength=440).pack(fill="x", pady=(10, 0))
 
     # --- réactions ---------------------------------------------------------------------------------
     def _edition(self) -> catalog.Edition:
@@ -277,11 +293,12 @@ class BuildDialog(Modal):
                                       "choix des types les moins chers.")
         pricing = self.static.pricing
         hour = offer.price_h + pricing.ipv4_h(offer.location)
-        storage = self.SNAPSHOT_GB * pricing.image_gb_month
+        snapshot_gb = self._snapshot_gb()
+        storage = snapshot_gb * pricing.image_gb_month
         self.cost.configure(text=f"≈ {fmt.eur(hour)} pour la construction  ·  puis ≈ {fmt.eur_m(storage)} de stockage")
         self.cost_sub.configure(text=f"Serveur {fmt.eur_h(offer.price_h)} + IPv4 {fmt.eur_h(pricing.ipv4_h(offer.location))}, "
-                                     f"1 h facturée ({self.DURATION_TEXT}) · snapshot d'environ "
-                                     f"{self.SNAPSHOT_GB} Go à {fmt.eur(pricing.image_gb_month, 4)}/Go/mois")
+                                     f"1 h facturée ({self._duration_text()}) · snapshot d'environ "
+                                     f"{snapshot_gb:.0f} Go à {fmt.eur(pricing.image_gb_month, 4)}/Go/mois")
         self._update_state()
 
     def _check_iso(self) -> None:
@@ -361,7 +378,7 @@ class BuildDialog(Modal):
             edition=ed.key, language=lang, iso_url=url, image_name=image,
             keyboard=self.kb_labels[self.kb_menu.get()], timezone=self.tz_labels[self.tz_menu.get()],
             admin_account=admin, server_type=offer.name, location=offer.location,
-            allow_cidr=netutil.normalize_cidr(ip), pin=self.pin_var.get())
+            allow_cidr=netutil.normalize_cidr(ip), pin=self.pin_var.get(), apps=tuple(self.picker.requested()))
         if self.app._safe(self.ctrl.build_desktop, name, params) is not None:
             self.close(params)
 
@@ -380,6 +397,7 @@ class BuildDoneDialog(Modal):
             self._linux_details(res)
         else:
             self._windows_details(res)
+        self._software_details(res)
         self.launch_btn = self.buttons(("Fermer", self.cancel, "secondary"),
                                        ("Copier le mot de passe", self._copy, "secondary"),
                                        ("Lancer maintenant", self._launch, "primary"))[2]
@@ -404,7 +422,8 @@ class BuildDoneDialog(Modal):
             f"{loc.label if loc else res.get('locale')} · fuseau {tz}",
             f"Image fluide ({xrdp} avec H.264), son, presse-papiers ; la session suit la taille de la fenêtre",
             "Le clavier suit celui de ce PC à chaque connexion ; tu retrouves ta session là où tu l'as laissée",
-            "Installer un logiciel : Terminal → sudo apt install <paquet>",
+            "Autres logiciels : menu Applications → Logiciels, ou « Logiciels… » dans cette application ; "
+            "sinon Terminal → sudo apt install <paquet>",
             "Mises à jour de sécurité automatiques ; les volumes ajoutés apparaissent dans le gestionnaire de fichiers",
         ])
         if res.get("session_ok") is False:
@@ -415,6 +434,25 @@ class BuildDoneDialog(Modal):
                         "d'attendre l'arrêt forcé.", "warning", pady=(12, 0))
         self.notice("Pour regarder des vidéos confortablement, lance-le sur un type à 4 vCPU ou plus.", "info",
                     pady=(12, 0))
+
+    def _software_details(self, res: dict) -> None:
+        shown = [a.key for a in software_catalog.APPS]   # ordre d'affichage du catalogue
+        ok = sorted(res.get("apps_ok") or [], key=shown.index)
+        failed = sorted(res.get("apps_failed") or [], key=shown.index)
+        if not ok and not failed and res.get("admin_ok", True):
+            return
+        self.section("Logiciels")
+        if ok:
+            self.text(", ".join(software_catalog.names(ok)) + ".", t.TEXT, 12, pady=(0, 0))
+            self.text("Le fichier « Premiers pas » sur le Bureau donne la première commande de chacun ; connecte-toi "
+                      "à tes comptes au premier lancement.", t.MUTED, 11, pady=(4, 0))
+        if failed:
+            self.notice(f"Non installé(s) : {', '.join(software_catalog.names(failed))}. Lance le bureau puis "
+                        "réessaie depuis « Logiciels… » (menu ⋯ de sa carte).", "warning", pady=(8, 0))
+        if not res.get("admin_ok", True):
+            self.notice("L'accès d'administration n'a pas pu être activé : pour installer des logiciels depuis "
+                        "l'application, ouvre « Logiciels… » une fois le bureau lancé (une commande à coller).",
+                        "warning", pady=(8, 0))
 
     def _windows_details(self, res: dict) -> None:
         ed = catalog.EDITIONS.get(res.get("edition"))

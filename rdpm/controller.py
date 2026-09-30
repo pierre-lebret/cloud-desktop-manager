@@ -20,7 +20,7 @@ from typing import Callable
 from . import fmt, license, netutil, rdp
 from .config import AppConfig, SessionLog
 from .constants import (
-    MAX_FIREWALL_SOURCES, OS_LINUX, OS_WINDOWS, L_CERT, L_LOC, L_OP_TS, L_TYPE, OP_BUILDING, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING,
+    ADMIN_KEY_PATH, MAX_FIREWALL_SOURCES, OS_LINUX, OS_WINDOWS, L_ADMIN, L_APPS, L_CERT, L_DESKTOP, L_LOC, L_OP_TS, L_TYPE, OP_BUILDING, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING,
     PROBE_BOOTING_S, PROBE_READY_S, PUBLIC_IP_REFRESH_S, REFRESH_BUSY_S, REFRESH_IDLE_S, STATIC_CACHE_PATH,
 )
 from .events import (
@@ -44,8 +44,10 @@ from .ops.resources import (
 )
 from .ops.runner import BusyError, OperationRunner
 from .ops.save import DiscardOp, ResumeOp, SaveOp
+from .ops.software import ADMIN_FW_PREFIX, SoftwareOp
 from .pricing import CostSummary, billing_minute, compute_costs, server_burn, session_cost
 from .rdp import CredentialStore
+from .software import catalog as software_catalog
 from .state import (
     SERVER_STATES, STATE_STYLE, Act, DState, Grouping, allowed_actions, derive_state, group_inventory,
     primary_action,
@@ -55,7 +57,7 @@ log = logging.getLogger(__name__)
 
 TRANSITIONAL = {DState.BOOTING, DState.STOPPING, DState.SNAPSHOT_PENDING, DState.LAUNCHING, DState.SAVING,
                 DState.CHECKPOINTING, DState.DISCARDING, DState.DUPLICATING, DState.BUILDING, DState.BUSY,
-                DState.PENDING}
+                DState.PENDING, DState.INSTALLING}
 
 OP_NAMES_FR = {OP_SAVING: "sauvegarde", OP_CHECKPOINT: "sauvegarde", OP_DISCARDING: "fermeture",
                OP_LAUNCHING: "lancement", "duplicating": "duplication", OP_BUILDING: "construction"}
@@ -154,6 +156,7 @@ class AppController:
         self.ctx = OpContext(backend, config, creds, sessions, self.queue.put, self.host, self.hard_stop,
                              lambda: self.static, register_secret=on_secret)
         self.ui = None
+        self._swept_firewalls: set[int] = set()
 
         self.static: StaticData | None = None
         self.inventory: Inventory | None = None
@@ -325,6 +328,7 @@ class AppController:
             self._last_refresh_started = ev.started
             self._regroup()
             self._sync_probes()
+            self._sweep_admin_firewalls()
             if not self._creds_swept:
                 self._sweep_creds()
             busy = bool(self.runner.active()) or any(
@@ -386,6 +390,31 @@ class AppController:
             self.ui.toast(f"{op.title} « {op.name} » annulée", "warning")
         self._regroup()
         self.refresh_now()
+
+    def _sweep_admin_firewalls(self) -> None:
+        """Pare-feu SSH temporaire d'une opération « Logiciels » interrompue (application fermée en cours) :
+        retiré et supprimé dès qu'aucune opération de ce bureau ne l'utilise plus."""
+        if self.mode == "readonly" or not self.inventory:
+            return
+        for fw in self.inventory.firewalls:
+            if not fw.name.startswith(ADMIN_FW_PREFIX) or fw.id in self._swept_firewalls:
+                continue
+            slug = fw.labels.get(L_DESKTOP)
+            if slug and self.runner.for_slug(slug):
+                continue
+            self._swept_firewalls.add(fw.id)
+            self._bg.submit(self._drop_firewall, fw)
+
+    def _drop_firewall(self, fw: FirewallInfo) -> None:
+        try:
+            if fw.applied_server_ids:
+                self.backend.remove_firewall(fw.id, list(fw.applied_server_ids))
+                time.sleep(5)
+            self.backend.delete_firewall(fw.id)
+            log.info("Pare-feu SSH temporaire %s supprimé", fw.name)
+        except Exception as exc:  # noqa: BLE001 - nouvel essai au prochain rafraîchissement
+            log.warning("Pare-feu SSH temporaire %s non supprimé : %s", fw.name, exc)
+            self._swept_firewalls.discard(fw.id)
 
     def _sync_probes(self) -> None:
         running = {s.id: s for s in self.inventory.servers if s.status == "running" and s.managed}
@@ -846,6 +875,42 @@ class AppController:
         return self._submit(op_class(self.ctx, slug, name, params))
 
     build_windows = build_desktop
+
+    # --- logiciels --------------------------------------------------------------------------------
+    def installed_apps(self, d: Desktop) -> set[str]:
+        """Logiciels du catalogue connus sur ce bureau (serveur, sinon dernière sauvegarde)."""
+        labels = d.server.labels if d.server else (d.latest.labels if d.latest else {})
+        return software_catalog.decode(labels.get(L_APPS))
+
+    def admin_access(self, d: Desktop) -> bool:
+        """La clé d'administration de l'application est posée sur ce bureau (label rdpm-admin)."""
+        labels = d.server.labels if d.server else (d.latest.labels if d.latest else {})
+        return labels.get(L_ADMIN) == "1"
+
+    def password_known(self, slug: str) -> bool:
+        return bool(self.creds.get_password(slug))
+
+    def admin_key_on_this_pc(self) -> bool:
+        return bool(getattr(self.backend.remote, "simulated", False)) or ADMIN_KEY_PATH.exists()
+
+    def admin_public_key(self) -> str:
+        """Clé publique d'administration (créée au premier besoin), pour activer l'accès d'un ancien bureau."""
+        remote = self.backend.remote
+        if remote is None or not remote.available():
+            raise UserError("Client OpenSSH introuvable sur ce poste",
+                            "Paramètres Windows → Applications → Fonctionnalités facultatives → Client OpenSSH.")
+        return remote.admin_keypair(ADMIN_KEY_PATH)
+
+    def software(self, slug: str, keys: list[str] | tuple[str, ...] = (), mode: str = "install") -> Operation:
+        """Installe (mode « install »), met à jour (« update ») ou relit (« inventory ») les logiciels d'un
+        bureau lancé."""
+        d = self._require(slug)
+        if not d.server or not d.server.ipv4:
+            raise UserError("Lance le bureau pour installer des logiciels")
+        if mode == "install" and not software_catalog.resolve(keys, d.os):
+            raise UserError("Choisis au moins un logiciel")
+        user = self.config.prefs(slug).rdp_user
+        return self._submit(SoftwareOp(self.ctx, slug, d.name, d.server.id, d.server.ipv4, d.os, keys, mode, user))
 
     def add_volume(self, slug: str, size: int, volume_name: str) -> Operation:
         d = self._require(slug)

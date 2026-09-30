@@ -12,7 +12,10 @@ from ...constants import OS_LINUX, OS_WINDOWS, VOLUME_MAX_GB, VOLUME_MIN_GB
 from ...hetzner.errors import UserError
 from ...labels import slugify
 from ...models import Desktop
+from ...software import catalog as software_catalog
+from ...software.windows import render_admin_access_ps1
 from .. import theme as t
+from ..software import SoftwarePicker
 from ..widgets import bind_enabled, caption, on_edit, ghost_button, label, primary_button, secondary_button
 from .base import CONFIRM_WORD, Modal, confirm, confirm_typed, info, is_confirm_word
 
@@ -31,7 +34,7 @@ class LiveModal(Modal):
         if not self.winfo_exists():
             return
         busy = tuple(id(op) for op in self.ctrl.runner.active())
-        version = (self.ctrl.inventory_version, busy, self.ctrl.public_ip)
+        version = (self.ctrl.inventory_version, busy, self.ctrl.public_ip, self.version_extra())
         if version != self._version:
             self._version = version
             for child in self.content.winfo_children():
@@ -43,6 +46,10 @@ class LiveModal(Modal):
 
     def render(self, parent) -> None:
         raise NotImplementedError
+
+    def version_extra(self):
+        """État supplémentaire qui, s'il change, redessine la fenêtre (en plus de l'inventaire)."""
+        return None
 
     def after_render(self) -> None:
         """Mise à jour des parties fixes de la fenêtre (hors `content`) après un nouveau rendu."""
@@ -768,3 +775,143 @@ def resize_help(app, os_name: str = OS_WINDOWS, volume_id: int | None = None) ->
         "Gestion des disques → clic droit sur le volume → Étendre le volume. Ou en PowerShell :",
     ], code="$p = Get-Partition -DriveLetter D\n"
             "Resize-Partition -DriveLetter D -Size (Get-PartitionSupportedSize -DriveLetter D).SizeMax")
+
+
+# --- logiciels --------------------------------------------------------------------------------------
+class SoftwareDialog(LiveModal):
+    """Logiciels du catalogue sur un bureau : ce qui est installé, et installation ou mise à jour depuis
+    l'application (bureau lancé, accès d'administration actif)."""
+
+    def __init__(self, app, desktop: Desktop) -> None:
+        self.slug, self.os_name = desktop.slug, desktop.os
+        super().__init__(app, f"Logiciels — {desktop.name}", width=700)
+        self.picker: SoftwarePicker | None = None
+        self.chosen: set[str] = set()   # cases cochées, conservées quand la fenêtre se redessine
+        self.heading("Logiciels prêts à l'emploi",
+                     "IA et développement, installés depuis leurs sources officielles dans leur dernière version. "
+                     "Tu te connectes à tes comptes (Claude, ChatGPT, GitHub…) au premier lancement de chaque "
+                     "logiciel : aucune clé n'est enregistrée par l'application.")
+        self.content.pack(fill="both", expand=True)
+        self.close_btn, self.update_btn, self.install_btn = self.buttons(
+            ("Fermer", self.cancel, "secondary"), ("Tout mettre à jour", self._update, "secondary"),
+            ("Installer", self._install, "primary"))
+
+    # --- rendu ----------------------------------------------------------------------------------
+    def render(self, parent) -> None:
+        d = self.ctrl.desktop(self.slug)
+        self.picker = None
+        if d is None:
+            return
+        op = self.ctrl.runner.for_slug(self.slug)
+        installed = self.ctrl.installed_apps(d)
+        if not d.server:
+            self._render_archived(parent, installed)
+            return
+        if op is not None and op.kind == "software":
+            self.text(f"{op.phase}", t.ACCENT, 13, parent=parent, pady=(12, 0))
+            self.text("Tu peux continuer à travailler dans le bureau pendant l'installation. Le résultat s'affichera "
+                      "ici et dans une notification.", t.MUTED, 12, parent=parent, pady=(4, 0))
+            return
+        if not self.ctrl.admin_access(d) or not self.ctrl.admin_key_on_this_pc():
+            self._render_enable(parent, d)
+            return
+        if self.os_name == OS_WINDOWS and not self.ctrl.password_known(self.slug):
+            self.notice("Le mot de passe Windows de ce bureau n'est pas enregistré sur ce PC : il sert à lancer "
+                        "l'installation sous ton compte. Renseigne-le dans « Identifiants RDP… ».", "warning",
+                        parent=parent)
+            secondary_button(parent, "Identifiants RDP…", lambda: CredentialsDialog(self.app, d),
+                             width=170).pack(anchor="w", pady=(8, 0))
+            return
+        self.picker = SoftwarePicker(parent, self.os_name, installed=installed, chosen=self.chosen,
+                                     on_change=self._on_pick, height=330, wraplength=560)
+        self.picker.pack(fill="both", expand=True, pady=(12, 0))
+        if op is not None:
+            self.notice(f"Opération en cours sur ce bureau ({op.title.lower()}) : attends sa fin.", "warning",
+                        parent=parent)
+        else:
+            self.text("Les ajouts vivent sur le disque du serveur : « Sauvegarder & fermer » les conserve dans la "
+                      "sauvegarde. L'application ouvre SSH à ton IP le temps de l'installation seulement.", t.MUTED,
+                      11, parent=parent, pady=(8, 0))
+
+    def version_extra(self):
+        op = self.ctrl.runner.for_slug(self.slug)
+        return (self.os_name == OS_WINDOWS and self.ctrl.password_known(self.slug),
+                op.phase if op is not None and op.kind == "software" else None)
+
+    def _render_archived(self, parent, installed: set[str]) -> None:
+        names = software_catalog.names(k for k in software_catalog.install_order() if k in installed)
+        self.text("Dans la dernière sauvegarde : " + (", ".join(names) if names else "aucun logiciel du catalogue "
+                  "(ou bureau créé avant cette fonction)."), t.TEXT, 12, parent=parent, pady=(14, 0))
+        self.notice("Lance le bureau pour en installer d'autres : ils s'ajoutent pendant que tu travailles.", "info",
+                    parent=parent)
+
+    def _render_enable(self, parent, d: Desktop) -> None:
+        linux_os = self.os_name == OS_LINUX
+        why = ("ce bureau a été créé avant cette fonction ou depuis un autre PC" if self.ctrl.admin_access(d) is False
+               else "la clé d'administration de ce bureau n'est pas sur ce PC")
+        self.notice(f"L'application n'a pas encore accès à ce bureau pour y installer des logiciels ({why}).",
+                    "warning", parent=parent)
+        steps = ("1. Dans le bureau, ouvre un terminal et colle cette commande (mot de passe « sudo » demandé).\n"
+                 if linux_os else
+                 "1. Dans le bureau, ouvre PowerShell en administrateur et colle ce bloc (il active OpenSSH, "
+                 "connexion par clé seulement).\n")
+        self.text(steps + "2. Clique sur « C'est fait, vérifier » : l'application teste l'accès puis lit les logiciels "
+                  "installés.\nLe port SSH reste fermé en dehors des installations lancées d'ici.", t.TEXT, 12,
+                  parent=parent)
+        try:
+            code = self._enable_code()
+        except UserError as exc:
+            self.notice(str(exc), "danger", parent=parent)
+            return
+        box = ctk.CTkTextbox(parent, height=110 if linux_os else 200, font=t.mono(11), fg_color=t.SURFACE_2,
+                             wrap="char" if linux_os else "none")
+        box.insert("1.0", code)
+        box.configure(state="disabled")
+        box.pack(fill="x", pady=(8, 0))
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=(8, 0))
+        secondary_button(row, "Copier", lambda: self._copy(code), width=100).pack(side="left")
+        primary_button(row, "C'est fait, vérifier", self._verify, width=170).pack(side="left", padx=(8, 0))
+
+    def _enable_code(self) -> str:
+        pubkey = self.ctrl.admin_public_key()
+        if self.os_name == OS_LINUX:
+            return ("sudo sh -c 'install -d -m 0700 /root/.ssh && echo \"" + pubkey + "\" >> "
+                    "/root/.ssh/authorized_keys && chmod 0600 /root/.ssh/authorized_keys' && echo OK")
+        return render_admin_access_ps1(pubkey)
+
+    def _on_pick(self) -> None:
+        self.chosen = set(self.picker.user) if self.picker else set()
+        self.after_render()
+
+    def after_render(self) -> None:
+        d = self.ctrl.desktop(self.slug)
+        busy = bool(self.ctrl.runner.for_slug(self.slug))
+        # Installer / Tout mettre à jour : seulement quand la liste est proposée.
+        for btn in (self.install_btn, self.update_btn):
+            btn.pack_forget()
+        if self.picker is not None:
+            self.install_btn.pack(side="right", padx=(8, 0), before=self.close_btn)
+            self.update_btn.pack(side="right", padx=(8, 0), before=self.close_btn)
+        todo = self.picker.selected() if self.picker else []
+        self.install_btn.configure(text=f"Installer ({len(todo)})" if todo else "Installer",
+                                   state=self.enabled_state(bool(todo) and not busy))
+        self.update_btn.configure(state=self.enabled_state(self.picker is not None and not busy and bool(
+            d and self.ctrl.installed_apps(d))))
+
+    # --- actions --------------------------------------------------------------------------------
+    def _install(self) -> None:
+        if self.picker and self.picker.selected():
+            if self.run(self.ctrl.software, self.slug, self.picker.selected(), "install"):
+                self.chosen = set()
+
+    def _update(self) -> None:
+        self.run(self.ctrl.software, self.slug, (), "update")
+
+    def _verify(self) -> None:
+        self.run(self.ctrl.software, self.slug, (), "inventory")
+
+    def _copy(self, code: str) -> None:
+        self.clipboard_clear()
+        self.clipboard_append(code)
+        self.app.toast("Commande copiée", "info")

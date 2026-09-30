@@ -114,7 +114,10 @@ def test_build_success(harness):
     assert {r["port"] for r in fw_body["rules"]} == {"22", "80", "3389"}
     assert all(r["source_ips"] == ["198.51.100.23/32"] for r in fw_body["rules"])
     tags = [t for t, _ in h.fake.remote.calls]
-    assert tags[:3] == ["ping", "ubuntu-prepare", "reboot"] and tags[-2:] == ["alpine-hook", "reboot"]
+    assert tags[:3] == ["ping", "ubuntu-prepare", "reboot"]
+    hook = tags.index("alpine-hook")
+    assert tags[hook:hook + 4] == ["alpine-hook", "reboot", "ping", "win-postinstall-status"]
+    assert tags[hook + 4] == "win-apps-start" and tags[-1] == "win-apps-cleanup"
     assert op.followup == "build_done" and op.result["admin_account"] == "Administrateur"
 
 

@@ -295,6 +295,12 @@ class HetznerService:
                            {"apply_to": [{"type": "server", "server": {"id": sid}} for sid in server_ids]})
         return _action_ids(resp)
 
+    def remove_firewall(self, firewall_id: int, server_ids: list[int]) -> list[int]:
+        resp = self._write("POST", f"/firewalls/{firewall_id}/actions/remove_from_resources",
+                           "retirer le pare-feu",
+                           {"remove_from": [{"type": "server", "server": {"id": sid}} for sid in server_ids]})
+        return _action_ids(resp)
+
     def list_firewalls(self, label_selector: str) -> list[FirewallInfo]:
         return [FirewallInfo.from_api(d) for d in
                 self._get_all("/firewalls", "firewalls", {"label_selector": label_selector})]

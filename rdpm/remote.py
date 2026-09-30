@@ -7,6 +7,7 @@ puis exécuté avec stdin fermé, pour qu'aucune commande du script ne consomme 
 
 from __future__ import annotations
 
+import base64
 import getpass
 import logging
 import os
@@ -39,6 +40,7 @@ class Remote(Protocol):
 
     def available(self) -> bool: ...
     def keypair(self, path: Path) -> str: ...
+    def admin_keypair(self, path: Path) -> str: ...
     def forget_keypair(self, path: Path) -> None: ...
     def url_size(self, url: str) -> int | None: ...
     def run(self, host: str, script: str, *, key: Path, known_hosts: Path, timeout: float,
@@ -60,9 +62,28 @@ def _flags() -> int:
     return CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
+# Windows (OpenSSH, interpréteur cmd.exe) : PowerShell lit le script sur stdin, l'écrit dans un .ps1
+# temporaire (UTF-8 avec BOM, lu correctement par PowerShell 5), l'exécute et renvoie son code de sortie.
+_PS_RUNNER = (
+    "$ErrorActionPreference='Stop';"
+    "$ms=New-Object IO.MemoryStream;[Console]::OpenStandardInput().CopyTo($ms);"
+    "$f=Join-Path $env:TEMP ('rdpm-'+[guid]::NewGuid().ToString('N')+'.ps1');"
+    "[IO.File]::WriteAllText($f,[Text.Encoding]::UTF8.GetString($ms.ToArray()),(New-Object Text.UTF8Encoding $true));"
+    "$r=1;try{& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $f;$r=$LASTEXITCODE}"
+    "finally{Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue};exit $r"
+)
+
+
+def powershell_command() -> str:
+    encoded = base64.b64encode(_PS_RUNNER.encode("utf-16-le")).decode("ascii")
+    return f"powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}"
+
+
 def remote_command(shell: str, user: str = "root") -> str:
     """Commande distante : lit tout le script sur stdin, l'exécute (via sudo si l'utilisateur n'est pas
-    root) avec stdin fermé, puis nettoie."""
+    root) avec stdin fermé, puis nettoie. `shell="powershell"` : serveur Windows (OpenSSH)."""
+    if shell == "powershell":
+        return powershell_command()
     runner = f"{shell}" if user == "root" else f"sudo -n {shell}"
     return (f"sh -c 'f=$(mktemp) && cat >\"$f\" && {runner} \"$f\" </dev/null; r=$?; "
             f"rm -f \"$f\"; exit $r'")
@@ -83,6 +104,9 @@ class SshRemote:
 
     def keypair(self, path: Path) -> str:
         return generate_keypair(path)
+
+    def admin_keypair(self, path: Path) -> str:
+        return ensure_keypair(path, ADMIN_KEY_COMMENT)
 
     def forget_keypair(self, path: Path) -> None:
         remove_keypair(path)
@@ -117,7 +141,20 @@ class SshRemote:
                             proc.stderr.decode("utf-8", "replace"))
 
 
-def generate_keypair(path: Path) -> str:
+ADMIN_KEY_COMMENT = "cloud-desktop-manager-admin"
+
+
+def ensure_keypair(path: Path, comment: str) -> str:
+    """Clé durable (accès d'administration des bureaux) : créée au premier besoin puis réutilisée."""
+    pub = path.with_suffix(path.suffix + ".pub")
+    if path.exists() and pub.exists():
+        text = pub.read_text(encoding="utf-8").strip()
+        if text:
+            return text
+    return generate_keypair(path, comment)
+
+
+def generate_keypair(path: Path, comment: str = "rdpm-build") -> str:
     """Crée une clé ed25519 sans phrase de passe ; renvoie la clé publique (une ligne)."""
     exe = ssh_exe("ssh-keygen")
     if not exe:
@@ -128,7 +165,7 @@ def generate_keypair(path: Path) -> str:
             p.unlink()
         except FileNotFoundError:
             pass
-    subprocess.run([exe, "-q", "-t", "ed25519", "-N", "", "-C", "rdpm-build", "-f", str(path)],
+    subprocess.run([exe, "-q", "-t", "ed25519", "-N", "", "-C", comment, "-f", str(path)],
                    check=True, capture_output=True, creationflags=_flags())
     restrict_key_acl(path)
     return path.with_suffix(path.suffix + ".pub").read_text(encoding="utf-8").strip()

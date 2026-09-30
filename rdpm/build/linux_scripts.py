@@ -7,7 +7,10 @@
 - `render_build_xrdp` : compilation + configuration d'xrdp, déposée sur le bureau dans
   /usr/local/share/rdpm/build-xrdp.sh pour une mise à jour ultérieure depuis son terminal.
 - `linux_finalize` : ouverture d'une vraie session XFCE de test, empreinte du certificat RDP, nettoyage
-  (clé SSH temporaire retirée, identité machine réinitialisée pour chaque copie).
+  (clé SSH temporaire remplacée par la clé d'administration de l'application, identité machine réinitialisée
+  pour chaque copie).
+- Étape « Logiciels » : dépose `rdpm-apps` (software/linux.py) et installe les logiciels choisis ; un échec
+  n'arrête pas la construction (jalons « RDPM-APP » dans le journal).
 
 Aucun mot de passe n'apparaît dans ces scripts, sauf dans `linux_prepare` qui transite par l'entrée
 standard SSH et est effacé aussitôt exécuté.
@@ -17,6 +20,7 @@ from __future__ import annotations
 
 import base64
 
+from ..software import linux as apps_linux
 from . import linux
 from .scripts import TAG_PREFIX, sh_quote
 
@@ -24,7 +28,7 @@ INSTALL_LOG = "/var/log/rdpm-install.log"
 INSTALL_UNIT = "rdpm-install"
 INSTALL_SCRIPT = "/root/rdpm-install.sh"
 BUILD_XRDP_PATH = "/usr/local/share/rdpm/build-xrdp.sh"
-INSTALL_STEPS = 6
+INSTALL_STEPS = 7
 
 
 def _fill(template: str, values: dict[str, str]) -> str:
@@ -462,7 +466,7 @@ PKGS=(xserver-xorg-core xauth x11-xserver-utils xfce4-session xfwm4 xfce4-panel 
       file-roller greybird-gtk-theme elementary-xfce-icon-theme adwaita-icon-theme fonts-noto-core
       fonts-noto-color-emoji fonts-dejavu-core dbus-user-session at-spi2-core xdg-user-dirs xdg-utils pipewire
       pipewire-pulse wireplumber pipewire-bin pavucontrol locales tzdata sudo curl ca-certificates gnupg
-      unattended-upgrades openssl)
+      unattended-upgrades openssl zenity xz-utils python3)
 for agent in policykit-1-gnome mate-polkit lxpolkit; do
     if available "$agent"; then PKGS+=("$agent"); break; fi
 done
@@ -505,11 +509,17 @@ if has_systemd; then
     systemctl is-active --quiet xrdp-sesman.service
     systemctl is-active --quiet xrdp.service
 fi
+
+step 7 "Logiciels"
+@@APPS_DEPLOY@@
+# Un logiciel en échec est signalé (RDPM-APP fail) sans faire échouer le bureau.
+rdpm-apps install @@APPS@@ || true
 echo RDPM-DONE
 """
 
 
-def render_install_script(*, distro: str, username: str, locale: str, timezone: str) -> str:
+def render_install_script(*, distro: str, username: str, locale: str, timezone: str,
+                          apps: tuple[str, ...] | list[str] = ()) -> str:
     d = linux.DISTROS[distro]
     loc = linux.LOCALES[locale]
     return _fill(_INSTALL, {
@@ -521,6 +531,8 @@ def render_install_script(*, distro: str, username: str, locale: str, timezone: 
         "UBUNTU_PACKS": " ".join(sh_quote(p) for p in loc.ubuntu_packs),
         "MOZILLA_FPR": linux.MOZILLA_KEY_FINGERPRINT, "BUILD_XRDP_PATH": sh_quote(BUILD_XRDP_PATH),
         "BUILD_XRDP_B64": _b64(render_build_xrdp()),
+        "APPS_DEPLOY": apps_linux.deploy_snippet(username).rstrip("\n"),
+        "APPS": " ".join(sh_quote(k) for k in apps),
     })
 
 
@@ -560,14 +572,16 @@ state=$(systemctl show {INSTALL_UNIT} -p ActiveState --value 2>/dev/null || true
 result=$(systemctl show {INSTALL_UNIT} -p Result --value 2>/dev/null || true)
 echo "RDPM_UNIT ${{state:-unknown}} ${{result:-unknown}}"
 echo RDPM_MARKS_BEGIN
-grep -a '^RDPM-' {INSTALL_LOG} 2>/dev/null | tail -n 20 || true
+grep -a '^RDPM-' {INSTALL_LOG} 2>/dev/null | tail -n 200 || true
 echo RDPM_TAIL_BEGIN
 tail -n 12 {INSTALL_LOG} 2>/dev/null || true
 """
 
 
-def linux_finalize(username: str) -> str:
-    """Session XFCE de test, empreinte du certificat, puis nettoyage avant l'arrêt et le snapshot."""
+def linux_finalize(username: str, admin_pubkey: str = "") -> str:
+    """Session XFCE de test, empreinte du certificat, puis nettoyage avant l'arrêt et le snapshot. La clé SSH
+    temporaire est remplacée par la clé d'administration de l'application (installation de logiciels plus
+    tard ; le port SSH reste fermé par le pare-feu du fournisseur hors opération)."""
     return f"""{TAG_PREFIX}linux-finalize
 set -u
 USERNAME={sh_quote(username)}
@@ -596,6 +610,13 @@ apt-get clean
 journalctl --rotate >/dev/null 2>&1 || true
 journalctl --vacuum-time=1s >/dev/null 2>&1 || true
 rm -f /root/.bash_history /root/.ssh/authorized_keys
+ADMIN_KEY={sh_quote(admin_pubkey)}
+if [ -n "$ADMIN_KEY" ]; then
+    install -d -m 0700 /root/.ssh
+    printf '%s\n' "$ADMIN_KEY" > /root/.ssh/authorized_keys
+    chmod 0600 /root/.ssh/authorized_keys
+    echo RDPM_ADMIN 1
+fi
 if command -v cloud-init >/dev/null 2>&1; then
     cloud-init clean --logs --machine-id >/dev/null 2>&1 || cloud-init clean --logs >/dev/null 2>&1 || true
 fi
