@@ -65,8 +65,13 @@ available() { apt-cache policy "$1" 2>/dev/null | awk '/Candidate:/ && $2 != "(n
 as_user() {   # commande exécutée par le compte du bureau, dans un shell de connexion (PATH, profil)
     local home
     home=$(user_home)
+    local proxy=()   # un éventuel proxy du réseau suit la commande
+    local v
+    for v in http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY; do
+        [ -n "${!v:-}" ] && proxy+=("$v=${!v}")
+    done
     runuser -u "$DESKTOP_USER" -- env -i HOME="$home" USER="$DESKTOP_USER" LOGNAME="$DESKTOP_USER" \
-        SHELL=/bin/bash LANG="${LANG:-C.UTF-8}" PATH=/usr/local/bin:/usr/bin:/bin \
+        SHELL=/bin/bash LANG="${LANG:-C.UTF-8}" PATH=/usr/local/bin:/usr/bin:/bin "${proxy[@]}" \
         bash -lc "cd \"\$HOME\" && $1"
 }
 
@@ -117,7 +122,7 @@ Categories=$cats
 EOF
 }
 
-install_uv() {   # binaire officiel (GitHub astral-sh/uv), empreinte SHA-256 publiée vérifiée
+setup_uv() {   # binaire officiel (GitHub astral-sh/uv), empreinte SHA-256 publiée vérifiée
     local tmp file base=https://github.com/astral-sh/uv/releases/latest/download
     file="uv-$(uname -m)-unknown-linux-gnu.tar.gz"
     tmp=$(mktemp -d)
@@ -130,7 +135,7 @@ install_uv() {   # binaire officiel (GitHub astral-sh/uv), empreinte SHA-256 pub
     /usr/local/bin/uv --version
 }
 
-install_node() {   # dernière version LTS officielle (nodejs.org), SHASUMS256 vérifié
+setup_node() {   # dernière version LTS officielle (nodejs.org), SHASUMS256 vérifié
     local tmp version file arch
     case "$ARCH" in amd64) arch=x64 ;; arm64) arch=arm64 ;; *) echo "architecture $ARCH non prise en charge"; return 1 ;; esac
     tmp=$(mktemp -d)
@@ -148,7 +153,7 @@ install_node() {   # dernière version LTS officielle (nodejs.org), SHASUMS256 v
     echo "Node.js $version"
 }
 
-install_go() {   # dernière version officielle (go.dev), SHA-256 publié vérifié
+setup_go() {   # dernière version officielle (go.dev), SHA-256 publié vérifié
     local tmp file sha
     tmp=$(mktemp -d)
     fetch 'https://go.dev/dl/?mode=json' "$tmp/dl.json"
@@ -167,7 +172,7 @@ print(f["filename"], f["sha256"])' "$tmp/dl.json" "$ARCH")
     rm -rf "$tmp"
 }
 
-install_rustup() {   # rustup-init officiel (static.rust-lang.org), SHA-256 vérifié, pour le compte du bureau
+setup_rustup() {   # rustup-init officiel (static.rust-lang.org), SHA-256 vérifié, pour le compte du bureau
     local tmp triple
     triple="$(uname -m)-unknown-linux-gnu"
     tmp=$(mktemp -d)
@@ -180,7 +185,7 @@ install_rustup() {   # rustup-init officiel (static.rust-lang.org), SHA-256 vér
     rm -rf "$tmp"
 }
 
-install_dotnet() {   # paquets de la distribution (Ubuntu) ou dépôt Microsoft (Debian)
+setup_dotnet() {   # paquets de la distribution (Ubuntu) ou dépôt Microsoft (Debian)
     local pkg deb
     pkg=$(apt-cache search --names-only '^dotnet-sdk-[0-9]+\.[0-9]+$' | awk '{print $1}' | sort -V | tail -n1)
     if [ -z "$pkg" ] && [ "$ID" = debian ]; then
@@ -198,7 +203,7 @@ install_dotnet() {   # paquets de la distribution (Ubuntu) ou dépôt Microsoft 
     apt_install "$pkg"
 }
 
-install_docker() {   # dépôt officiel Docker si la version de la distribution y est, sinon paquets de la distribution
+setup_docker() {   # dépôt officiel Docker si la version de la distribution y est, sinon paquets de la distribution
     if curl -fsI "https://download.docker.com/linux/$ID/dists/$CODENAME/Release" >/dev/null 2>&1; then
         apt_repo docker "https://download.docker.com/linux/$ID/gpg" 9DC858229FC7DD38854AE2D88D81803C0EBFCD88 \
             "deb [arch=$ARCH signed-by=@KEYRING@] https://download.docker.com/linux/$ID $CODENAME stable"

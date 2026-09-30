@@ -254,9 +254,9 @@ APPS: list[App] = [
         "Python 3 avec pip et venv, et uv (Astral) pour les projets et les dernières versions de Python.",
         LinuxRecipe(
             install="apt_install python3 python3-venv python3-pip python3-dev pipx\n"
-                    "install_uv",
+                    "setup_uv",
             check="have python3 && have uv",
-            update="install_uv"),
+            update="setup_uv"),
         WindowsRecipe(
             install="Install-Winget (Get-LatestPythonId) -Scope machine\nInstall-Winget 'astral-sh.uv'",
             check="(Test-Command 'python') -and (Test-Command 'uv')",
@@ -266,9 +266,9 @@ APPS: list[App] = [
     App("node", 12, "Node.js LTS", CAT_LANGS,
         "Dernière version LTS officielle (nodejs.org), avec npm et pnpm.",
         LinuxRecipe(
-            install="install_node\nnpm_global pnpm@latest",
+            install="setup_node\nnpm_global pnpm@latest",
             check="have node && have npm",
-            update="install_node\nnpm update -g --no-fund --no-audit || true"),
+            update="setup_node\nnpm update -g --no-fund --no-audit || true"),
         WindowsRecipe(
             install="Install-Winget 'OpenJS.NodeJS.LTS' -Scope machine\nInstall-Npm @('pnpm@latest')",
             check="Test-Command 'node'",
@@ -285,12 +285,12 @@ APPS: list[App] = [
         _win_winget("Oven-sh.Bun"),
         first_step="Terminal : bun --version", size_gb=0.1, minutes=0.5),
     App("go", 14, "Go", CAT_LANGS, "Le langage Go (dernière version officielle, go.dev).",
-        LinuxRecipe(install="install_go", check="[ -x /usr/local/go/bin/go ]", update="install_go"),
+        LinuxRecipe(install="setup_go", check="[ -x /usr/local/go/bin/go ]", update="setup_go"),
         _win_winget("GoLang.Go", scope="machine"),
         first_step="Terminal : go version", size_gb=0.3, minutes=1),
     App("rust", 15, "Rust", CAT_LANGS, "Rust via rustup (cargo, rustc), chaîne stable.",
         LinuxRecipe(
-            install="apt_install build-essential pkg-config libssl-dev\ninstall_rustup",
+            install="apt_install build-essential pkg-config libssl-dev\nsetup_rustup",
             check="user_has .cargo/bin/cargo",
             update="as_user \"\\$HOME/.cargo/bin/rustup update </dev/null\""),
         WindowsRecipe(
@@ -311,7 +311,7 @@ APPS: list[App] = [
         _win_winget("EclipseAdoptium.Temurin.25.JDK", scope="machine"),
         first_step="Terminal : java -version", size_gb=0.5, minutes=1.5),
     App("dotnet", 17, ".NET SDK", CAT_LANGS, "Le SDK .NET de Microsoft (dernière version).",
-        LinuxRecipe(install="install_dotnet", check="have dotnet"),
+        LinuxRecipe(install="setup_dotnet", check="have dotnet"),
         _win_winget("Microsoft.DotNet.SDK.10"),
         first_step="Terminal : dotnet new console", size_gb=0.8, minutes=2),
     # --- Outils ------------------------------------------------------------------------------------------------------
@@ -331,7 +331,7 @@ APPS: list[App] = [
         first_step="Terminal : gh auth login", requires=("git",), size_gb=0.1, minutes=0.5,
         badges=(BADGE_ACCOUNT,), recommended=True),
     App("docker", 20, "Docker", CAT_TOOLS, "Docker Engine et Compose (conteneurs), utilisable sans sudo.",
-        LinuxRecipe(install="install_docker", check="have docker"),
+        LinuxRecipe(install="setup_docker", check="have docker"),
         "Indisponible sous Windows : Docker Desktop exige la virtualisation imbriquée, absente des serveurs "
         "cloud Hetzner (utilise un bureau Linux).",
         first_step="Terminal : docker run hello-world (après une reconnexion)", size_gb=0.5, minutes=1.5),

@@ -121,6 +121,21 @@ def test_linux_tool_lists_and_expands_without_root(tmp_path):
     assert r.stdout.split() == catalog.resolve(["openclaw", "codex"], OS_LINUX)
 
 
+def test_generated_tools_define_each_function_once():
+    """Une aide qui porterait le nom d'une recette (install_node…) la remplacerait : récursion infinie."""
+    bash_defs = re.findall(r"^([A-Za-z_][A-Za-z0-9_]*)\(\) \{", apps_linux.render_tool(), re.M)
+    assert len(bash_defs) == len(set(bash_defs)), sorted({d for d in bash_defs if bash_defs.count(d) > 1})
+    # Chaque aide appelée par une recette existe (setup_node, npm_global, apt_repo…).
+    tool = apps_linux.render_tool()
+    for app in catalog.for_os(OS_LINUX):
+        for body in (app.linux.install, app.linux.check, app.linux.update):
+            for word in re.findall(r"^\s*([a-z_]+)\b", body, re.M):
+                if "_" in word or word in ("fetch", "have"):
+                    assert re.search(rf"^{word}\(\) \{{", tool, re.M), (app.key, word)
+    ps_defs = [d.lower() for d in re.findall(r"^function ([A-Za-z-_]+)", apps_windows.render_tool(), re.M)]
+    assert len(ps_defs) == len(set(ps_defs)), sorted({d for d in ps_defs if ps_defs.count(d) > 1})
+
+
 def test_windows_tool_is_parsable_and_secret_free(tmp_path):
     tool = apps_windows.render_tool()
     start = apps_windows.apps_start(["vscode"], "S3cr'et!")
