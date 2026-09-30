@@ -1,4 +1,4 @@
-"""Dialogues de gestion : pare-feu, volumes, sauvegardes, IP fixe, identifiants, duplication, suppression."""
+"""Dialogues de gestion : accès RDP (pare-feu), volumes, sauvegardes, IP fixe, identifiants, duplication, suppression."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from typing import Callable
 import customtkinter as ctk
 
 from ... import fmt, netutil
-from ...constants import MAX_FIREWALL_SOURCES, VOLUME_MAX_GB, VOLUME_MIN_GB
+from ...constants import VOLUME_MAX_GB, VOLUME_MIN_GB
 from ...hetzner.errors import UserError
 from ...labels import slugify
 from ...models import Desktop
 from .. import theme as t
-from ..widgets import caption, ghost_button, label, primary_button, secondary_button
+from ..widgets import bind_enabled, caption, on_edit, ghost_button, label, primary_button, secondary_button
 from .base import CONFIRM_WORD, Modal, confirm, confirm_typed, info, is_confirm_word
 
 
@@ -30,129 +30,240 @@ class LiveModal(Modal):
     def _poll(self) -> None:
         if not self.winfo_exists():
             return
-        busy = bool(self.ctrl.runner.active())
-        version = (self.ctrl.inventory_version, busy)
+        busy = tuple(id(op) for op in self.ctrl.runner.active())
+        version = (self.ctrl.inventory_version, busy, self.ctrl.public_ip)
         if version != self._version:
             self._version = version
             for child in self.content.winfo_children():
                 child.destroy()
             self.render(self.content)
+            self.after_render()
             self.refit()
         self.after(500, self._poll)
 
     def render(self, parent) -> None:
         raise NotImplementedError
 
-    def run(self, fn: Callable, *args, **kwargs) -> None:
+    def after_render(self) -> None:
+        """Mise à jour des parties fixes de la fenêtre (hors `content`) après un nouveau rendu."""
+
+    @staticmethod
+    def enabled_state(enabled: bool) -> str:
+        return "normal" if enabled else "disabled"
+
+    def run(self, fn: Callable, *args, **kwargs) -> bool:
         try:
             fn(*args, **kwargs)
         except (UserError, ValueError) as exc:
             self.app.toast(str(exc), "error")
+            return False
+        return True
 
 
-# --- pare-feu -------------------------------------------------------------------------------------
+# --- accès RDP (pare-feu) -----------------------------------------------------------------------------
+SHARED_SCOPE = "Tous les bureaux"
+DESKTOP_SCOPE = "Ce bureau"
+
+
 class FirewallDialog(LiveModal):
+    """Accès RDP : liste commune à tous les bureaux du projet + liste propre à chaque bureau.
+
+    Ouverte depuis une carte : la liste du bureau et la liste commune. Depuis l'en-tête : toutes les listes."""
+
     def __init__(self, app, desktop: Desktop | None = None) -> None:
         self.desktop_slug = desktop.slug if desktop else None
-        super().__init__(app, "Pare-feu RDP", width=640)
-        self.heading("Adresses autorisées en RDP",
-                     "Seules ces adresses peuvent joindre tes bureaux sur le port 3389 (TCP et UDP).")
+        title = f"Accès RDP — {desktop.name}" if desktop else "Accès RDP"
+        super().__init__(app, title, width=700)
+        self.heading("Accès RDP",
+                     "Seules les adresses listées peuvent joindre tes bureaux sur le port RDP (3389, TCP et UDP). "
+                     "Chaque bureau accepte les adresses de la liste commune et celles de sa propre liste.")
         self.content.pack(fill="x")
-        self.desc_var = tk.StringVar(value="Maison")
-        self.cidr_entry = None
-        self.error = None
+        self.scope_var = tk.StringVar(value=DESKTOP_SCOPE if desktop else SHARED_SCOPE)
+        self.scopes: dict[str, str | None] = {}
+        self._build_form()
         self.buttons(("Fermer", self.cancel, "primary"))
 
-    def _firewall(self):
-        d = self.ctrl.desktop(self.desktop_slug) if self.desktop_slug else None
-        fws = self.ctrl.firewalls_of(d) if d else []
-        return fws[0] if fws else self.ctrl.rdp_firewall()
-
+    # --- listes ---------------------------------------------------------------------------------
     def render(self, parent) -> None:
-        fw = self._firewall()
-        ip = self.ctrl.public_ip
         d = self.ctrl.desktop(self.desktop_slug) if self.desktop_slug else None
-        if fw is None:
-            box = ctk.CTkFrame(parent, fg_color="transparent")
-            box.pack(fill="x", pady=(14, 0))
-            label(box, "Aucun pare-feu RDP géré.", 13, "bold").pack(anchor="w")
-            adoptable = self.ctrl.grouping.adoptable_firewalls
-            if adoptable:
-                primary_button(box, f"Adopter « {adoptable[0].name} »",
-                               lambda: self.run(self.ctrl.adopt_firewall, adoptable[0].id), width=220).pack(
-                    anchor="w", pady=(8, 0))
-            elif ip:
-                primary_button(box, f"Créer un pare-feu limité à {ip}",
-                               lambda: self.run(self.ctrl.create_firewall, netutil.normalize_cidr(ip), "Mon IP"),
-                               width=260).pack(anchor="w", pady=(8, 0))
+        busy = self.ctrl.firewall_busy()
+        if self.desktop_slug and d is None:
+            label(parent, "Ce bureau n'existe plus.", 12, color=t.MUTED).pack(fill="x", pady=(12, 0))
             return
-        sub = f"Pare-feu « {fw.name} »"
-        if d and d.server and fw.id not in d.server.firewall_ids:
-            sub += " — non appliqué à ce serveur"
-        label(parent, sub, 12, color=t.MUTED).pack(fill="x", pady=(10, 6))
-        if d and d.server and not d.server.firewall_ids:
-            secondary_button(parent, "Appliquer à ce serveur", lambda: self.run(self.ctrl.apply_firewall, d.slug),
-                             width=200).pack(anchor="w", pady=(0, 8))
+        if d is not None:
+            self._server_status(parent, d, busy)
+            self._block(parent, f"Ce bureau uniquement ({d.name})", d.slug, busy)
+            self._block(parent, "Tous les bureaux du projet", None, busy)
+        else:
+            desktops = self.ctrl.grouping.desktops
+            holder = parent
+            if len(desktops) > 2:
+                holder = ctk.CTkScrollableFrame(parent, fg_color="transparent", height=380)
+                holder.pack(fill="x")
+            self._block(holder, "Tous les bureaux du projet", None, busy)
+            for desk in desktops:
+                self._block(holder, f"{desk.name} uniquement", desk.slug, busy)
+        if busy:
+            label(parent, "Mise à jour des accès…", 12, color=t.ACCENT).pack(fill="x", pady=(8, 0))
+
+    def _server_status(self, parent, d: Desktop, busy: bool) -> None:
+        missing = self.ctrl.unapplied_firewalls(d)
+        if not (d.server and missing):
+            return
+        names = ", ".join(f"« {f.name} »" for f in missing)
+        box = self.notice(f"Pas encore appliqué au serveur de ce bureau : {names}.", "warning", parent=parent)
+        secondary_button(box, "Appliquer maintenant", lambda: self.run(self.ctrl.apply_firewall, d.slug),
+                         width=180, state=self.enabled_state(not busy)).pack(anchor="w", padx=12, pady=(0, 8))
+
+    def _block(self, parent, title: str, slug: str | None, busy: bool) -> None:
+        ip = self.ctrl.public_ip
+        caption(parent, title).pack(fill="x", pady=(14, 4))
         table = ctk.CTkFrame(parent, fg_color=t.SURFACE, corner_radius=10, border_width=1, border_color=t.BORDER)
         table.pack(fill="x")
         table.grid_columnconfigure(1, weight=1)
-        sources = netutil.rdp_sources(fw.rules)
+        if slug is None and self.ctrl.rdp_firewall() is None:
+            self._no_shared(table, busy)
+            return
+        sources = self.ctrl.rdp_sources_of(slug)
         if not sources:
-            label(table, "Aucune adresse autorisée : personne ne peut se connecter.", 12,
-                  color=t.tone("warning")[0]).grid(row=0, column=0, padx=12, pady=12)
+            empty = ("Aucune adresse propre : seules celles de la liste commune s'appliquent." if slug else
+                     "Aucune adresse commune : seuls les accès propres à chaque bureau s'appliquent.")
+            label(table, empty, 12, color=t.MUTED, wraplength=600).grid(row=0, column=0, columnspan=3, sticky="w",
+                                                                         padx=12, pady=10)
         for row, (cidr, desc) in enumerate(sources):
             mine = bool(ip) and netutil.ip_allowed(ip, [cidr])
             ctk.CTkLabel(table, text=cidr, font=t.mono(12), text_color=t.TEXT, anchor="w").grid(
-                row=row, column=0, sticky="w", padx=12, pady=6)
+                row=row, column=0, sticky="w", padx=12, pady=5)
             label(table, (desc or "—") + ("   · ton IP actuelle" if mine else ""), 12,
                   color=t.tone("success")[0] if mine else t.MUTED).grid(row=row, column=1, sticky="w")
-            ghost_button(table, "Retirer", lambda c=cidr, m=mine: self._remove(fw.id, c, m), width=70,
-                         text_color=t.tone("danger")[0]).grid(row=row, column=2, padx=8)
-        busy = any(op.title == "Pare-feu" for op in self.ctrl.runner.active())
-        if busy:
-            label(parent, "Mise à jour du pare-feu…", 12, color=t.ACCENT).pack(fill="x", pady=(8, 0))
+            ghost_button(table, "Retirer", lambda c=cidr, m=mine: self._remove(slug, c, m), width=70,
+                         text_color=t.tone("danger")[0], state=self.enabled_state(not busy)).grid(row=row, column=2, padx=8)
 
-        add = ctk.CTkFrame(parent, fg_color="transparent")
-        add.pack(fill="x", pady=(16, 0))
-        caption(add, "Ajouter une adresse").pack(anchor="w")
-        if ip and not any(netutil.ip_allowed(ip, [c]) for c, _ in sources):
-            primary_button(add, f"Autoriser mon IP actuelle ({ip})",
-                           lambda: self._add(fw.id, ip, self.desc_var.get() or "Mon IP"), width=280).pack(
-                anchor="w", pady=(6, 8))
-        row = ctk.CTkFrame(add, fg_color="transparent")
-        row.pack(fill="x", pady=(4, 0))
-        self.cidr_entry = ctk.CTkEntry(row, placeholder_text="IP ou réseau (ex. 203.0.113.7 ou 10.0.0.0/24)",
-                                       height=32, width=290, font=t.mono(12))
+    def _no_shared(self, table, busy: bool) -> None:
+        ip = self.ctrl.public_ip
+        label(table, "Pas encore de liste commune.", 12, color=t.tone("warning")[0]).grid(
+            row=0, column=0, sticky="w", padx=12, pady=10)
+        adoptable = self.ctrl.grouping.adoptable_firewalls
+        if adoptable:
+            primary_button(table, f"Importer « {adoptable[0].name} »",
+                           lambda: self.run(self.ctrl.adopt_firewall, adoptable[0].id), width=220,
+                           state=self.enabled_state(not busy)).grid(row=0, column=2, padx=8, pady=6)
+        elif ip:
+            primary_button(table, f"Créer avec mon IP ({ip})",
+                           lambda: self.run(self.ctrl.create_firewall, netutil.normalize_cidr(ip), "Mon IP"),
+                           width=220, state=self.enabled_state(not busy)).grid(row=0, column=2, padx=8, pady=6)
+
+    # --- ajout ----------------------------------------------------------------------------------
+    def _build_form(self) -> None:
+        form = ctk.CTkFrame(self.body, fg_color="transparent")
+        form.pack(fill="x", pady=(18, 0))
+        head = ctk.CTkFrame(form, fg_color="transparent")
+        head.pack(fill="x")
+        caption(head, "Ajouter une adresse pour").pack(side="left")
+        self.scope_holder = ctk.CTkFrame(head, fg_color="transparent")
+        self.scope_holder.pack(side="left", padx=(10, 0))
+        self._scope_sig = None
+
+        self.mine_btn = secondary_button(form, "Autoriser mon IP actuelle", self._add_mine, width=300)
+        self.mine_btn.pack(anchor="w", pady=(10, 0))
+        row = ctk.CTkFrame(form, fg_color="transparent")
+        row.pack(fill="x", pady=(10, 0))
+        self.cidr_entry = ctk.CTkEntry(row, height=32, width=290, font=t.mono(12),
+                                       placeholder_text="IP ou réseau (ex. 203.0.113.7 ou 10.0.0.0/24)")
         self.cidr_entry.pack(side="left")
-        ctk.CTkEntry(row, textvariable=self.desc_var, placeholder_text="Description", height=32, width=150,
-                     font=t.font(12)).pack(side="left", padx=8)
-        secondary_button(row, "Ajouter", lambda: self._add(fw.id, self.cidr_entry.get(), self.desc_var.get()),
-                         width=90).pack(side="left")
-        self.error = label(add, "", 12, color=t.tone("danger")[0])
-        self.error.pack(fill="x", pady=(4, 0))
-        if len(sources) >= MAX_FIREWALL_SOURCES:
-            self.error.configure(text=f"Limite de {MAX_FIREWALL_SOURCES} adresses atteinte : retire les anciennes.")
+        self.cidr_entry.bind("<Return>", lambda _e: self._add())
+        on_edit(self.cidr_entry, self._update_form)
+        self.desc_entry = ctk.CTkEntry(row, placeholder_text="Description (ex. Maison)", height=32, width=170,
+                                       font=t.font(12))
+        self.desc_entry.pack(side="left", padx=8)
+        self.add_btn = secondary_button(row, "Ajouter", self._add, width=90)
+        self.add_btn.pack(side="left")
+        self.hint = label(form, "", 12, color=t.tone("danger")[0], wraplength=640)
+        self.hint.pack(fill="x", pady=(4, 0))
+        self.scope_var.trace_add("write", lambda *_: self._update_form())
 
-    def _add(self, fw_id: int, raw: str, desc: str) -> None:
+    def _render_scopes(self) -> None:
+        if self.desktop_slug:
+            d = self.ctrl.desktop(self.desktop_slug)
+            self.scopes = {DESKTOP_SCOPE: self.desktop_slug, SHARED_SCOPE: None} if d else {SHARED_SCOPE: None}
+        else:
+            self.scopes = {SHARED_SCOPE: None}
+            for d in self.ctrl.grouping.desktops:
+                self.scopes[d.name if d.name not in self.scopes else f"{d.name} ({d.slug})"] = d.slug
+        sig = tuple(self.scopes)
+        if sig == self._scope_sig:
+            return
+        self._scope_sig = sig
+        for child in self.scope_holder.winfo_children():
+            child.destroy()
+        if self.scope_var.get() not in self.scopes:
+            self.scope_var.set(next(iter(self.scopes)))
+        if self.desktop_slug:
+            ctk.CTkSegmentedButton(self.scope_holder, values=list(self.scopes), variable=self.scope_var,
+                                   font=t.font(12), height=28, selected_color=t.ACCENT,
+                                   selected_hover_color=t.ACCENT_HOVER).pack(side="left")
+        else:
+            ctk.CTkOptionMenu(self.scope_holder, values=list(self.scopes), variable=self.scope_var, width=220,
+                              height=28, font=t.font(12), fg_color=t.SURFACE_2, button_color=t.SURFACE_3,
+                              button_hover_color=t.BORDER, text_color=t.TEXT,
+                              dropdown_font=t.font(12)).pack(side="left")
+
+    def _scope(self) -> str | None:
+        return self.scopes.get(self.scope_var.get())
+
+    def _problem(self, raw: str) -> str | None:
+        """Raison d'un refus, "" si le champ est vide, None si l'adresse peut être ajoutée."""
+        if not raw.strip():
+            return ""
         try:
             cidr = netutil.normalize_cidr(raw)
         except ValueError as exc:
-            if self.error is not None:
-                self.error.configure(text=str(exc))
-            return
-        if self.error is not None:
-            self.error.configure(text="")
-        self.run(self.ctrl.firewall_change, fw_id, add=[(cidr, (desc or "").strip()[:60] or "Accès")])
-        if self.cidr_entry is not None and self.cidr_entry.winfo_exists():
-            self.cidr_entry.delete(0, "end")
+            return str(exc)
+        return self.ctrl.rdp_source_problem(self._scope(), cidr)
 
-    def _remove(self, fw_id: int, cidr: str, mine: bool) -> None:
-        message = f"L'adresse {cidr} ne pourra plus se connecter en RDP."
+    def after_render(self) -> None:
+        self._render_scopes()
+        self._update_form()
+
+    def _update_form(self) -> None:
+        if not self.winfo_exists() or not self.scopes:
+            return
+        busy = self.ctrl.firewall_busy()
+        problem = self._problem(self.cidr_entry.get())
+        self.add_btn.configure(state=self.enabled_state(problem is None and not busy))
+        ip = self.ctrl.public_ip
+        mine = self._problem(ip) if ip else None
+        if not ip:
+            self.mine_btn.configure(text="Ton IP publique n'est pas encore connue", state="disabled")
+        elif mine and "déjà" in mine:
+            self.mine_btn.configure(text=f"✓  Ton IP ({ip}) est déjà autorisée ici", state="disabled")
+        else:
+            self.mine_btn.configure(text=f"Autoriser mon IP actuelle ({ip})",
+                                    state=self.enabled_state(mine is None and not busy))
+        # Motif affiché : celui de l'adresse saisie, sinon pourquoi « mon IP » est indisponible.
+        reason = problem or (mine if mine and "déjà" not in mine else "")
+        self.hint.configure(text=reason)
+
+    def _add_mine(self) -> None:
+        if self.ctrl.public_ip:
+            self.run(self.ctrl.allow_current_ip, self._scope(), self.desc_entry.get().strip() or "Mon IP")
+
+    def _add(self) -> None:
+        raw = self.cidr_entry.get()
+        if self._problem(raw) is not None or self.ctrl.firewall_busy():
+            return
+        if self.run(self.ctrl.add_rdp_source, self._scope(), raw, self.desc_entry.get()):
+            self.cidr_entry.delete(0, "end")
+            self._update_form()
+
+    def _remove(self, slug: str | None, cidr: str, mine: bool) -> None:
+        where = "ce bureau" if slug else "tous les bureaux du projet"
+        message = f"L'adresse {cidr} ne pourra plus se connecter en RDP à {where}."
         if mine:
-            message += "\n\nC'est ton IP actuelle : tu perdras l'accès depuis ce poste."
+            message += "\n\nC'est ton IP actuelle : tu risques de perdre l'accès depuis ce poste."
         ok, _ = confirm(self, "Retirer l'adresse ?", message, "Retirer", danger=mine)
         if ok:
-            self.run(self.ctrl.firewall_change, fw_id, remove=[cidr])
+            self.run(self.ctrl.remove_rdp_source, slug, cidr)
 
 
 # --- volumes --------------------------------------------------------------------------------------
@@ -178,7 +289,7 @@ class AddVolumeDialog(Modal):
         row.pack(fill="x")
         self.size_var = tk.StringVar(value="50")
         self.slider = ctk.CTkSlider(row, from_=VOLUME_MIN_GB, to=1000, number_of_steps=99,
-                                    command=lambda v: self.size_var.set(str(int(v))))
+                                    command=lambda v: self.size_var.set(str(int(v))))  # saisie : jusqu'au max
         self.slider.set(50)
         self.slider.pack(side="left", fill="x", expand=True)
         ctk.CTkEntry(row, textvariable=self.size_var, width=80, height=32, font=t.font(12)).pack(side="left", padx=8)
@@ -190,7 +301,9 @@ class AddVolumeDialog(Modal):
         self.notice("Le volume reste facturé quand le bureau est archivé (il n'est pas inclus dans le snapshot) "
                     "et sera rattaché automatiquement au prochain lancement.", "info")
         self.size_var.trace_add("write", lambda *_: self._update())
-        self.buttons(("Annuler", self.cancel, "secondary"), ("Créer et attacher", self._ok, "primary"))
+        ok = self.buttons(("Annuler", self.cancel, "secondary"), ("Créer et attacher", self._ok, "primary"))[1]
+        bind_enabled(ok, lambda: self._size() is not None and bool(slugify(self.name_var.get(), 63).strip()) and
+                     bool(self.name_var.get().strip()), self.size_var, self.name_var)
         self._update()
 
     def _size(self) -> int | None:
@@ -205,6 +318,8 @@ class AddVolumeDialog(Modal):
         if size is None:
             self.cost.configure(text=f"Taille entre {VOLUME_MIN_GB} et {VOLUME_MAX_GB} Go")
             return
+        if size <= 1000 and int(self.slider.get()) != size:
+            self.slider.set(size)
         self.cost.configure(text=f"{fmt.eur_m(size * self.price)}  ·  {fmt.eur(self.price, 4)} par Go et par mois")
 
     def _ok(self) -> None:
@@ -233,6 +348,7 @@ class VolumesDialog(LiveModal):
         if d is None:
             return
         price = self.ctrl.static.pricing.volume_gb_month if self.ctrl.static else 0.0
+        st = self.enabled_state(not self.ctrl.runner.for_slug(self.slug))
         if not d.volumes:
             label(parent, "Aucun volume.", 12, color=t.MUTED).pack(fill="x", pady=(12, 0))
         for vol in d.volumes:
@@ -246,17 +362,19 @@ class VolumesDialog(LiveModal):
                 row=1, column=0, sticky="w", padx=12, pady=(0, 10))
             actions = ctk.CTkFrame(box, fg_color="transparent")
             actions.grid(row=0, column=1, rowspan=2, padx=8)
-            ghost_button(actions, "Agrandir…", lambda v=vol: self._resize(v), width=80).pack(side="left")
+            ghost_button(actions, "Agrandir…", lambda v=vol: self._resize(v), width=80, state=st).pack(side="left")
             if vol.server_id:
-                ghost_button(actions, "Détacher", lambda v=vol: self._detach(v), width=70).pack(side="left")
+                ghost_button(actions, "Détacher", lambda v=vol: self._detach(v), width=70, state=st).pack(side="left")
             elif d.server and d.server.location == vol.location:
                 ghost_button(actions, "Attacher", lambda v=vol: self.run(self.ctrl.volume_action, self.slug, v,
-                                                                         "attach"), width=70).pack(side="left")
+                                                                         "attach"), width=70, state=st).pack(side="left")
             ghost_button(actions, "Supprimer…", lambda v=vol: self._delete(v), width=80,
-                         text_color=t.tone("danger")[0]).pack(side="left")
+                         text_color=t.tone("danger")[0], state=st).pack(side="left")
         if d.server and d.server.status in ("running", "off"):
             secondary_button(parent, "+ Ajouter un volume", lambda: AddVolumeDialog(self.app, d),
-                             width=180).pack(anchor="w", pady=(14, 0))
+                             width=180, state=st).pack(anchor="w", pady=(14, 0))
+        elif not d.server:
+            label(parent, "Lance le bureau pour lui ajouter un volume.", 12, color=t.MUTED).pack(fill="x", pady=(12, 0))
 
     def _resize(self, vol) -> None:
         def check(value: str) -> str | None:
@@ -274,8 +392,9 @@ class VolumesDialog(LiveModal):
             self.run(self.ctrl.volume_action, self.slug, vol, "resize", int(value))
 
     def _detach(self, vol) -> None:
-        ok, _ = confirm(self, "Détacher le volume ?", f"« {vol.name} » sera retiré de Windows (fermez les fichiers "
-                        "qui s'y trouvent). Il reste facturé et sera rattaché au prochain lancement.", "Détacher")
+        ok, _ = confirm(self, "Détacher le volume ?", f"« {vol.name} » sera retiré du système (ferme d'abord les "
+                        "fichiers qui s'y trouvent). Il reste facturé et sera rattaché au prochain lancement.",
+                        "Détacher")
         if ok:
             self.run(self.ctrl.volume_action, self.slug, vol, "detach")
 
@@ -303,7 +422,9 @@ class SnapshotsDialog(LiveModal):
         if d is None:
             return
         price = self.ctrl.static.pricing.image_gb_month if self.ctrl.static else 0.0
-        archived = d.server is None and not self.ctrl.runner.for_slug(self.slug)
+        busy = bool(self.ctrl.runner.for_slug(self.slug))
+        archived = d.server is None and not busy
+        st = self.enabled_state(not busy)
         latest = d.latest
         available = [s for s in d.snapshots if s.available]
         scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent", height=min(360, 84 * max(1, len(d.snapshots))))
@@ -338,9 +459,10 @@ class SnapshotsDialog(LiveModal):
             if snap.available:
                 ghost_button(actions, "Désépingler" if snap.protected else "Épingler",
                              lambda s=snap: self.run(self.ctrl.snapshot_action, self.slug, s,
-                                                     "unpin" if s.protected else "pin"), width=10).pack(side="left")
+                                                     "unpin" if s.protected else "pin"), width=10,
+                             state=st).pack(side="left")
                 ghost_button(actions, "Supprimer…", lambda s=snap: self._delete(s, len(available)), width=10,
-                             text_color=t.tone("danger")[0]).pack(side="left")
+                             text_color=t.tone("danger")[0], state=st).pack(side="left")
         total = sum(s.size_gb for s in d.snapshots)
         label(parent, f"Total : {fmt.gb(total)} · {fmt.eur_m(total * price)}", 12, "bold", color=t.MUTED).pack(
             fill="x", pady=(10, 0))
@@ -352,7 +474,7 @@ class SnapshotsDialog(LiveModal):
             if d and d.server is None:
                 if not confirm_typed(self, "Supprimer la dernière sauvegarde",
                                      "C'est la seule sauvegarde de ce bureau : il sera définitivement perdu.",
-                                     d.name, "Supprimer", lost=["Tout le contenu du bureau Windows"]):
+                                     d.name, "Supprimer", lost=["Tout le contenu du bureau"]):
                     return
                 self.run(self.ctrl.snapshot_action, self.slug, snap, "delete")
                 return
@@ -368,59 +490,74 @@ class FixedIpDialog(LiveModal):
     def __init__(self, app, desktop: Desktop) -> None:
         self.slug = desktop.slug
         super().__init__(app, f"IP fixe — {desktop.name}", width=580)
+        static = self.ctrl.static
+        loc = self.ctrl.config.prefs(self.slug).last_location or next(iter(static.locations), "nbg1")
         self.heading("IP fixe",
-                     "Une IP fixe garde la même adresse d'un lancement à l'autre (pratique pour un .rdp enregistré "
-                     "ou un accès filtré ailleurs). Elle coûte 0,50 €/mois et impose son emplacement.")
+                     "Une IP fixe garde la même adresse d'un lancement à l'autre (pratique pour un fichier .rdp "
+                     "enregistré ou un accès filtré ailleurs). Elle est facturée en permanence "
+                     f"({fmt.eur_m(static.pricing.ipv4_m(loc))}) et impose l'emplacement du bureau.")
         self.content.pack(fill="x")
-        self.choice = tk.StringVar(value="new")
-        self.buttons(("Fermer", self.cancel, "secondary"))
+        self.city_to_loc = {f"{static.city(l)} ({l})": l for l in static.locations}
+        self.loc_var = tk.StringVar(value=next((c for c, l in self.city_to_loc.items() if l == loc),
+                                               next(iter(self.city_to_loc), "")))
+        # Choix mémorisé entre deux rendus ; rien n'est réservé tant que « Activer » n'est pas cliqué.
+        self.choice = tk.StringVar(value="adopt" if self.ctrl.grouping.unassigned_ips else "new")
+        self.free_var = tk.StringVar()
+        self.buttons(("Fermer", self.cancel, "primary"))
 
     def render(self, parent) -> None:
         d = self.ctrl.desktop(self.slug)
         if d is None:
             return
         static = self.ctrl.static
+        busy = bool(self.ctrl.runner.for_slug(self.slug))
         if d.fixed_ip:
             ip = d.fixed_ip
             label(parent, f"{ip.ip}  ·  {static.city(ip.location)} · {fmt.eur_m(static.pricing.ipv4_m(ip.location))}",
                   14, "bold").pack(fill="x", pady=(14, 0))
             if d.server:
-                label(parent, "Fermez le bureau pour pouvoir supprimer son IP fixe.", 12, color=t.MUTED).pack(
+                label(parent, "Ferme le bureau pour pouvoir supprimer son IP fixe.", 12, color=t.MUTED).pack(
                     fill="x", pady=(6, 0))
             else:
                 ghost_button(parent, "Supprimer l'IP fixe…", lambda: self._release(d), width=10,
-                             text_color=t.tone("danger")[0]).pack(anchor="w", pady=(8, 0))
+                             text_color=t.tone("danger")[0], state=self.enabled_state(not busy)).pack(anchor="w", pady=(8, 0))
+            return
+        if busy:
+            label(parent, "Réservation de l'IP fixe en cours…", 12, color=t.ACCENT).pack(fill="x", pady=(14, 0))
             return
         if d.server:
             self.notice("Elle sera utilisée au prochain lancement (Hetzner exige un serveur éteint pour changer "
-                        "d'IP).", "info")
-        loc_default = self.ctrl.config.prefs(self.slug).last_location or "nbg1"
-        self.loc_var = tk.StringVar(value=loc_default)
+                        "d'IP).", "info", parent=parent)
         ctk.CTkRadioButton(parent, text="Réserver une nouvelle IP à", variable=self.choice, value="new",
                            font=t.font(12)).pack(anchor="w", pady=(14, 0))
-        ctk.CTkOptionMenu(parent, values=list(static.locations), variable=self.loc_var, width=160, height=30,
+        ctk.CTkOptionMenu(parent, values=list(self.city_to_loc), variable=self.loc_var, width=220, height=30,
                           font=t.font(12)).pack(anchor="w", padx=(28, 0), pady=(4, 0))
         free = self.ctrl.grouping.unassigned_ips
         self.free_map = {f"{ip.ip} ({static.city(ip.location)})": ip for ip in free}
         if free:
-            self.free_var = tk.StringVar(value=next(iter(self.free_map)))
-            ctk.CTkRadioButton(parent, text="Réutiliser une IP existante non assignée (gratuit en plus)",
+            if self.free_var.get() not in self.free_map:
+                self.free_var.set(next(iter(self.free_map)))
+            ctk.CTkRadioButton(parent, text="Réutiliser une IP déjà réservée et inutilisée (aucun coût en plus)",
                                variable=self.choice, value="adopt", font=t.font(12)).pack(anchor="w", pady=(12, 0))
             ctk.CTkOptionMenu(parent, values=list(self.free_map), variable=self.free_var, width=260, height=30,
                               font=t.font(12)).pack(anchor="w", padx=(28, 0), pady=(4, 0))
-            self.choice.set("adopt")
-        primary_button(parent, "Activer l'IP fixe", self._activate, width=180).pack(anchor="w", pady=(16, 0))
+        elif self.choice.get() == "adopt":
+            self.choice.set("new")
+        primary_button(parent, "Activer l'IP fixe", self._enable_fixed_ip, width=180).pack(anchor="w", pady=(16, 0))
 
-    def _activate(self) -> None:
-        if self.choice.get() == "adopt":
-            ip = self.free_map[self.free_var.get()]
-            self.run(self.ctrl.fixed_ip, self.slug, "adopt", ip=ip)
-        else:
-            self.run(self.ctrl.fixed_ip, self.slug, "create", location=self.loc_var.get())
+    def _enable_fixed_ip(self) -> None:
+        """Appelée uniquement par le bouton « Activer l'IP fixe »."""
+        if self.ctrl.runner.for_slug(self.slug):
+            return
+        if self.choice.get() == "adopt" and self.free_var.get() in getattr(self, "free_map", {}):
+            self.run(self.ctrl.fixed_ip, self.slug, "adopt", ip=self.free_map[self.free_var.get()])
+        elif self.loc_var.get() in self.city_to_loc:
+            self.run(self.ctrl.fixed_ip, self.slug, "create", location=self.city_to_loc[self.loc_var.get()])
 
     def _release(self, d: Desktop) -> None:
-        ok, _ = confirm(self, "Supprimer l'IP fixe ?", f"L'adresse {d.fixed_ip.ip} sera rendue à Hetzner "
-                        "(−0,50 €/mois). Les prochains lancements utiliseront une IP dynamique.", "Supprimer",
+        price = fmt.eur_m(self.ctrl.static.pricing.ipv4_m(d.fixed_ip.location))
+        ok, _ = confirm(self, "Supprimer l'IP fixe ?", f"L'adresse {d.fixed_ip.ip} sera rendue au fournisseur "
+                        f"(économie de {price}). Les prochains lancements utiliseront une IP dynamique.", "Supprimer",
                         danger=True)
         if ok:
             self.run(self.ctrl.fixed_ip, self.slug, "release", ip=d.fixed_ip)
@@ -433,9 +570,9 @@ class CredentialsDialog(Modal):
         self.app, self.slug = app, desktop.slug
         ctrl = app.controller
         has_pw = bool(ctrl.creds.get_password(desktop.slug))
-        self.heading("Identifiants Windows",
-                     "Stockés dans le Gestionnaire d'identifiants Windows, jamais en clair. Ils permettent la "
-                     "connexion en 1 clic.")
+        self.heading("Identifiants de connexion",
+                     "Compte du bureau distant, stocké dans le Gestionnaire d'identifiants de ce PC, jamais en "
+                     "clair. Il permet la connexion en 1 clic.")
         self.section("Utilisateur")
         self.user_var = tk.StringVar(value=ctrl.config.prefs(desktop.slug).rdp_user)
         ctk.CTkEntry(self.body, textvariable=self.user_var, height=32, font=t.font(12)).pack(fill="x")
@@ -444,7 +581,7 @@ class CredentialsDialog(Modal):
         row.pack(fill="x")
         self.pw = ctk.CTkEntry(row, height=32, font=t.font(12),
                                placeholder_text="Enregistré ✓ (laisser vide pour le garder)" if has_pw
-                               else "Mot de passe du compte Windows")
+                               else "Mot de passe du compte")
         self.pw.pack(side="left", fill="x", expand=True)
         self.show_var = tk.BooleanVar(value=False)
         self.pw.bind("<Key>", lambda _e: self.after(1, self._toggle_show))
@@ -454,7 +591,12 @@ class CredentialsDialog(Modal):
         specs = [("Annuler", self.cancel, "secondary"), ("Enregistrer", self._save, "primary")]
         if has_pw:
             specs.insert(0, ("Oublier le mot de passe", self._forget, "secondary"))
-        self.buttons(*specs)
+        save = self.buttons(*specs)[-1]
+        initial_user = self.user_var.get()
+        # Rien à enregistrer tant que ni l'utilisateur ni le mot de passe n'ont changé.
+        update = bind_enabled(save, lambda: bool(self.user_var.get().strip()) and
+                              (self.user_var.get().strip() != initial_user or bool(self.pw.get())), self.user_var)
+        on_edit(self.pw, update)
 
     def _toggle_show(self) -> None:
         self.pw.configure(show="" if self.show_var.get() or not self.pw.get() else "•")
@@ -494,14 +636,15 @@ class DuplicateDialog(Modal):
         label(self.body, f"Serveur temporaire jamais démarré, puis supprimé : ≈ 1 h de serveur facturée + "
                          f"{fmt.eur_m(month)} de stockage · 10 à 20 min.", 11, color=t.MUTED,
               wraplength=480).pack(fill="x", padx=(28, 0))
-        self.error = label(self.body, "", 12, color=t.tone("danger")[0])
-        self.error.pack(fill="x", pady=(6, 0))
-        self.buttons(("Annuler", self.cancel, "secondary"), ("Continuer", self._ok, "primary"))
+        label(self.body, "La copie ne reprend pas les accès RDP propres à ce bureau : seule la liste commune "
+                         "s'applique jusqu'à ce que tu en ajoutes.", 11, color=t.MUTED, wraplength=480).pack(
+            fill="x", pady=(10, 0))
+        ok = self.buttons(("Annuler", self.cancel, "secondary"), ("Continuer", self._ok, "primary"))[1]
+        bind_enabled(ok, lambda: bool(self.name_var.get().strip()), self.name_var)
 
     def _ok(self) -> None:
         name = self.name_var.get().strip()
         if not name:
-            self.error.configure(text="Nom requis")
             return
         self.close(True)
         if self.mode.get() == "launch":
@@ -519,7 +662,7 @@ class DeleteDesktopDialog(Modal):
         super().__init__(app, f"Supprimer « {desktop.name} »", width=560)
         self.app, self.desktop = app, desktop
         n = len(desktop.snapshots)
-        self.heading("Supprimer le bureau", "Action définitive : le bureau Windows ne pourra plus être relancé.")
+        self.heading("Supprimer le bureau", "Action définitive : le bureau ne pourra plus être relancé.")
         lost = [f"{n} sauvegarde{'s' if n > 1 else ''} ({fmt.gb(desktop.snapshot_gb)})"]
         if desktop.pinned_count:
             lost.append(f"dont {desktop.pinned_count} épinglée(s)")
@@ -533,7 +676,10 @@ class DeleteDesktopDialog(Modal):
         if desktop.fixed_ip:
             ctk.CTkCheckBox(self.body, text=f"Rendre l'IP fixe {desktop.fixed_ip.ip}", variable=self.ip_var,
                             font=t.font(12)).pack(anchor="w", pady=(8, 0))
-        self.section(f"Tapez {CONFIRM_WORD} pour confirmer")
+        if desktop.firewall:
+            label(self.body, f"✕  Accès RDP propres à ce bureau (liste « {desktop.firewall.name} »)", 12,
+                  color=t.tone("danger")[0]).pack(fill="x", pady=(8, 0))
+        self.section(f"Tape {CONFIRM_WORD} pour confirmer")
         self.var = tk.StringVar()
         entry = ctk.CTkEntry(self.body, textvariable=self.var, height=32, font=t.font(12),
                              placeholder_text=CONFIRM_WORD)
@@ -551,6 +697,7 @@ class DeleteDesktopDialog(Modal):
             self.app.controller.delete_desktop(self.desktop.slug, self.vol_var.get(), self.ip_var.get())
         except UserError as exc:
             self.app.toast(str(exc), "error")
+            return
         self.close(True)
 
 
@@ -560,8 +707,8 @@ class ConflictDialog(LiveModal):
         self.slug = desktop.slug
         super().__init__(app, f"Conflit — {desktop.name}", width=600)
         self.heading("Plusieurs serveurs pour un même bureau",
-                     "Cela arrive après une double exécution (deux postes). Gardez celui qui contient votre travail "
-                     "et supprimez les autres (sans sauvegarde).")
+                     "Cela arrive après une double exécution (deux postes). Garde celui qui contient ton travail "
+                     "et supprime les autres (sans sauvegarde).")
         self.content.pack(fill="x")
         self.buttons(("Fermer", self.cancel, "primary"))
 
@@ -578,7 +725,8 @@ class ConflictDialog(LiveModal):
             label(box, f"créé {fmt.ago(srv.created)}", 12, color=t.MUTED).pack(side="left")
             if d.extra_servers:
                 ghost_button(box, "Supprimer…", lambda s=srv: self._delete(s), width=10,
-                             text_color=t.tone("danger")[0]).pack(side="right", padx=8)
+                             text_color=t.tone("danger")[0],
+                             state=self.enabled_state(not self.ctrl.runner.active())).pack(side="right", padx=8)
 
     def _delete(self, srv) -> None:
         if confirm_typed(self, "Supprimer ce serveur", f"Le serveur {srv.name} et tout ce qu'il contient depuis sa "

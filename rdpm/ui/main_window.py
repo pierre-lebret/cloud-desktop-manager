@@ -1,4 +1,4 @@
-"""Fenêtre principale : bureaux de tous les projets Hetzner (une clé API par projet)."""
+"""Fenêtre principale : bureaux de tous les projets (une clé API d'un fournisseur cloud par projet)."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from ..projects import ProjectStore
 from ..state import Act
 from . import theme as t
 from .desktop_card import DesktopCard
+from .icons import OS_NAMES, set_window_icon
 from .dialogs.base import ask_text, confirm, confirm_typed, info, top_window
 from .dialogs.build import BuildDialog, BuildDoneDialog, LicenseDialog
 from .dialogs.launch import LaunchDialog
@@ -113,6 +114,7 @@ class MainWindow(ctk.CTk):
         for ctrl in hub.controllers:
             self.attach(ctrl)
         self.title(APP_TITLE)
+        set_window_icon(self)
         self.geometry("1220x820")
         self.minsize(720, 540)
         self.protocol("WM_DELETE_WINDOW", self.request_quit)
@@ -157,7 +159,7 @@ class MainWindow(ctk.CTk):
         """Exécute `action(scope)` sur le projet choisi (menu si plusieurs projets)."""
         choices = self.hub.active
         if not choices:
-            self.toast("Aucun projet Hetzner utilisable : ajoutez une clé API.", "warning")
+            self.toast("Aucun projet utilisable : ajoute une clé API.", "warning")
             return
         if len(choices) == 1:
             action(self.scope(choices[0]))
@@ -201,23 +203,23 @@ class MainWindow(ctk.CTk):
         return True
 
     def on_token_invalid(self, scope: ProjectScope) -> None:
-        """Clé refusée par Hetzner (au lancement, à la saisie ou pendant une action)."""
+        """Clé refusée par le fournisseur (au lancement, à la saisie ou pendant une action)."""
         ctrl = scope.controller
         spec = ctrl.project
         if ctrl not in self.hub.controllers:
             return
-        head = (f"Hetzner refuse la clé API du projet « {spec.name} » ({spec.masked}) : elle a été révoquée ou "
-                "supprimée. Ce projet n'est plus interrogé.")
+        head = (f"{spec.provider.short} refuse la clé API du projet « {spec.name} » ({spec.masked}) : elle a été "
+                "révoquée ou supprimée. Ce projet n'est plus interrogé.")
         if spec.source == "keyring":
             ok, _ = confirm(self, "Clé API refusée", head + "\n\nSupprimer cette clé du Gestionnaire d'identifiants ?",
                             "Supprimer la clé", danger=True)
             if ok:
                 self.remove_project(ctrl, forget=True)
         elif spec.source in ("env", ".env"):
-            where = "le fichier .env" if spec.source == ".env" else "la variable d'environnement HETZNER_TOKEN"
-            info(self, "Clé API refusée", [head, f"Cette clé vient de {where} : remplacez-la par une clé valide "
-                                                 "(console Hetzner → projet → Sécurité → Tokens API) puis relancez "
-                                                 "l'application."])
+            prov = spec.provider
+            where = "le fichier .env" if spec.source == ".env" else f"la variable d'environnement {prov.token_env}"
+            info(self, "Clé API refusée", [head, f"Cette clé vient de {where} : remplace-la par une clé valide "
+                                                 f"({prov.token_help}) puis relance l'application."])
         else:
             ok, _ = confirm(self, "Clé API refusée", head + "\n\nRetirer ce projet de la session ?", "Retirer",
                             danger=True)
@@ -232,17 +234,17 @@ class MainWindow(ctk.CTk):
         head.grid_columnconfigure(0, weight=1)
         titles = ctk.CTkFrame(head, fg_color="transparent")
         titles.grid(row=0, column=0, sticky="w")
-        label(titles, "Bureaux Windows", 24, "bold").pack(anchor="w")
-        self.subtitle = label(titles, "Chargement de l'inventaire Hetzner…", 12, color=t.MUTED)
+        label(titles, "Bureaux", 24, "bold").pack(anchor="w")
+        self.subtitle = label(titles, "Chargement de l'inventaire…", 12, color=t.MUTED)
         self.subtitle.pack(anchor="w")
 
         bar = self.head_bar = ctk.CTkFrame(head, fg_color="transparent")
         new = primary_button(bar, "+ Nouveau bureau", lambda: self.with_project(new, ImportChooser), width=150)
         new.pack(side="left", padx=(0, 8))
-        Tooltip(new, "Installer Windows, importer un snapshot ou un serveur existant (Ctrl+N)")
-        fw = secondary_button(bar, "Pare-feu", lambda: self.with_project(fw, FirewallDialog), width=96)
+        Tooltip(new, "Installer un système, importer un snapshot ou un serveur existant (Ctrl+N)")
+        fw = secondary_button(bar, "Accès RDP", lambda: self.with_project(fw, FirewallDialog), width=106)
         fw.pack(side="left", padx=(0, 8))
-        Tooltip(fw, "Adresses autorisées à se connecter en RDP (Ctrl+F)")
+        Tooltip(fw, "Adresses autorisées à se connecter : pour tous les bureaux ou bureau par bureau (Ctrl+F)")
         self.dormant_btn = secondary_button(bar, "Dormants", lambda: self.with_project(self.dormant_btn, DormantDialog),
                                             width=110)
         self.dormant_btn.pack(side="left", padx=(0, 8))
@@ -253,7 +255,8 @@ class MainWindow(ctk.CTk):
         settings = secondary_button(bar, "⚙", self._open_settings, width=40)
         settings.pack(side="left")
         Tooltip(settings, "Réglages (Ctrl+,)")
-        self.header_buttons = (new, fw, self.dormant_btn, refresh, settings)
+        self.header_buttons = (new, fw, self.dormant_btn, refresh, settings)   # grisés sans aucune clé API
+        self.inventory_buttons = (new, fw)                              # inutiles tant que rien n'est chargé
 
         stats = self.stats = ctk.CTkFrame(head, fg_color="transparent")
         stats.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(16, 0))
@@ -280,7 +283,7 @@ class MainWindow(ctk.CTk):
         self.empty_sub = label(self.empty, "", 13, color=t.MUTED, anchor="center", justify="center", wraplength=560)
         self.empty_sub.pack()
         self.empty_bar = ctk.CTkProgressBar(self.empty, mode="indeterminate", width=260, progress_color=t.ACCENT)
-        self.empty_btn = primary_button(self.empty, "Importer un snapshot",
+        self.empty_btn = primary_button(self.empty, "Importer un snapshot…",
                                         lambda: self.with_project(self.empty_btn, ImportChooser), width=200)
         self.empty_build_btn = primary_button(self.empty, "Créer un Windows de référence…",
                                               lambda: self.with_project(self.empty_build_btn, BuildDialog), width=260)
@@ -306,8 +309,8 @@ class MainWindow(ctk.CTk):
         def unlocked(fn):
             return lambda _e: None if self.hub.locked else fn()
         self.bind("<F5>", unlocked(self.hub.refresh_now))
-        self.bind("<Control-n>", unlocked(lambda: self.with_project(None, ImportChooser)))
-        self.bind("<Control-f>", unlocked(lambda: self.with_project(None, FirewallDialog)))
+        self.bind("<Control-n>", unlocked(lambda: self.hub.loaded and self.with_project(None, ImportChooser)))
+        self.bind("<Control-f>", unlocked(lambda: self.hub.loaded and self.with_project(None, FirewallDialog)))
         self.bind("<Control-l>", lambda _e: self.toggle_log())
         self.bind("<Control-comma>", unlocked(self._open_settings))
         self.bind("<Control-q>", lambda _e: self.request_quit())
@@ -317,11 +320,26 @@ class MainWindow(ctk.CTk):
             SettingsDialog(self.scope(self.hub.controllers[0]))
 
     def set_locked(self, locked: bool) -> None:
-        """Sans aucune clé API, tout ce qui parle à Hetzner reste désactivé."""
+        """Sans aucune clé API, tout ce qui parle au fournisseur reste désactivé."""
+        self._locked = locked
         state = "disabled" if locked else "normal"
         for btn in (*self.header_buttons, self.empty_btn, self.empty_build_btn):
             btn.configure(state=state)
+        self._buttons_sig = None
         self._render()
+
+    def _render_buttons(self) -> None:
+        """Boutons d'en-tête grisés quand ils n'ont rien à faire (inventaire absent, aucun dormant…)."""
+        hub = self.hub
+        usable = not hub.locked and bool(hub.active)
+        loaded = usable and any(c.inventory for c in hub.active)
+        sig = (usable, loaded, hub.dormant_count() > 0)
+        if sig == getattr(self, "_buttons_sig", None):
+            return
+        self._buttons_sig = sig
+        for btn in self.inventory_buttons:
+            btn.configure(state="normal" if loaded else "disabled")
+        self.dormant_btn.configure(state="normal" if loaded and sig[2] else "disabled")
 
     # --- mise en page adaptative ----------------------------------------------------------------
     def _on_window_resize(self, event) -> None:
@@ -372,6 +390,7 @@ class MainWindow(ctk.CTk):
     def _render(self) -> None:
         self._render_pending = False
         self._render_header()
+        self._render_buttons()
         self._render_banners()
         self.projects_bar.refresh()
         views = self.hub.desktop_views()
@@ -416,9 +435,9 @@ class MainWindow(ctk.CTk):
         hub = self.hub
         costs = hub.costs()
         if hub.locked:
-            self.subtitle.configure(text="Clé API Hetzner requise pour charger un projet")
+            self.subtitle.configure(text="Clé API requise pour charger un projet")
         elif not hub.loaded:
-            self.subtitle.configure(text="Chargement de l'inventaire Hetzner…")
+            self.subtitle.configure(text="Chargement de l'inventaire…")
         if not costs:
             for tile in (self.tile_running, self.tile_idle, self.tile_month):
                 tile.set("—", "En attente de l'inventaire")
@@ -432,12 +451,19 @@ class MainWindow(ctk.CTk):
                                + (f" · IP fixes {fmt.eur(costs.fixed_ips_month)}" if costs.fixed_ips_month else ""))
             self.tile_month.set(fmt.eur(costs.month_estimate), "Sessions + stockage au prorata")
         ip = hub.public_ip
-        allowed = hub.ip_is_allowed()
-        if ip:
+        access = hub.ip_access()
+        if ip and access:
+            ok, total = access
+            if ok == total:
+                sub, kind = ("Autorisée en RDP" if total == 1 else f"Autorisée en RDP sur les {total} bureaux"), "success"
+            elif ok == 0:
+                sub, kind = "Autorisée en RDP sur aucun bureau", "warning"
+            else:
+                sub, kind = f"Autorisée en RDP sur {ok} bureau{'x' if ok > 1 else ''} sur {total}", "info"
+            self.tile_ip.set(ip, sub, kind)
+        elif ip:
             loaded = any(c.inventory for c in hub.controllers)
-            sub = {True: "Autorisée sur le pare-feu RDP", False: "Non autorisée sur un pare-feu RDP",
-                   None: "Pare-feu RDP non géré" if loaded else "Pare-feu RDP pas encore lu"}[allowed]
-            self.tile_ip.set(ip, sub, {True: "success", False: "warning", None: None}[allowed])
+            self.tile_ip.set(ip, "Aucun pare-feu RDP géré" if loaded else "Accès RDP pas encore lus")
         else:
             self.tile_ip.set("…", "Détection en cours")
         if hub.loaded and not hub.locked:
@@ -446,8 +472,7 @@ class MainWindow(ctk.CTk):
             ago = time.monotonic() - stamp if stamp else 0
             refreshed = "à l'instant" if ago < 5 else f"il y a {fmt.duration(ago)}"
             projects = f"{len(hub.controllers)} projets · " if hub.multi else ""
-            self.subtitle.configure(text=f"Hetzner Cloud · {projects}{n} bureau{'x' if n > 1 else ''} · "
-                                         f"rafraîchi {refreshed}")
+            self.subtitle.configure(text=f"{projects}{n} bureau{'x' if n > 1 else ''} · rafraîchi {refreshed}")
         count = hub.dormant_count()
         text_ = f"Dormants ({count})" if count else "Dormants"
         if self.dormant_btn.cget("text") != text_:
@@ -482,8 +507,9 @@ class MainWindow(ctk.CTk):
         if hub.locked:
             self.empty_bar.stop()
             self.empty_bar.pack_forget()
-            self.empty_title.configure(text="Aucune clé API Hetzner")
-            self.empty_sub.configure(text="Ajoutez une clé API en haut de la fenêtre pour charger vos bureaux.")
+            self.empty_title.configure(text="Aucune clé API")
+            self.empty_sub.configure(text="Ajoute la clé API d'un projet en haut de la fenêtre pour charger tes "
+                                          "bureaux.")
             return
         if not hub.loaded:
             self.empty_title.configure(text="Chargement…")
@@ -496,18 +522,19 @@ class MainWindow(ctk.CTk):
         self.empty_bar.pack_forget()
         failing = [c for c in hub.controllers if c.inventory is None and c.refresh_error]
         if failing and len(failing) == len(hub.controllers):
-            self.empty_title.configure(text="Hetzner est injoignable")
+            self.empty_title.configure(text=f"{failing[0].project.provider.short} est injoignable")
             self.empty_sub.configure(text=str(failing[0].refresh_error))
             return
         self.empty_title.configure(text="Aucun bureau géré")
         if any(c.grouping.unmanaged_snapshots for c in hub.active if c.inventory):
-            self.empty_sub.configure(text="Tes snapshots Windows existants peuvent devenir des bureaux : "
-                                          "l'application les lancera à la demande et les sauvegardera à la fermeture. "
-                                          "Tu peux aussi installer un Windows neuf (+ Nouveau bureau).")
+            self.empty_sub.configure(text="Tes snapshots existants peuvent devenir des bureaux : l'application les "
+                                          "lancera à la demande et les sauvegardera à la fermeture. Tu peux aussi "
+                                          "installer un système neuf (+ Nouveau bureau).")
             self.empty_btn.pack(pady=16)
         else:
-            self.empty_sub.configure(text="Aucun snapshot Windows. L'application peut installer Windows toute seule "
-                                          "sur un serveur temporaire (≈ 30–40 min) et en faire ton premier bureau.")
+            self.empty_sub.configure(text="Aucun snapshot à importer. L'application peut installer Windows toute "
+                                          "seule sur un serveur temporaire (≈ 30–40 min) et en faire ton premier "
+                                          "bureau. Linux arrivera bientôt.")
             self.empty_build_btn.pack(pady=16)
 
     def _render_imports(self) -> None:
@@ -542,7 +569,9 @@ class MainWindow(ctk.CTk):
                 cmd = lambda s=obj, sc=scope: AdoptDialog(sc, server=s)  # noqa: E731
             label(box, title, 13, "bold").grid(row=0, column=0, sticky="w", padx=16, pady=(10, 0))
             label(box, detail, 12, color=t.MUTED).grid(row=1, column=0, sticky="w", padx=16, pady=(0, 10))
-            secondary_button(box, "Importer…", cmd, width=110).grid(row=0, column=1, rowspan=2, padx=16)
+            importing = any(type(op).__name__ in ("AdoptSnapshotOp", "AdoptServerOp") for op in ctrl.runner.active())
+            secondary_button(box, "Importer…", cmd, width=110, state="disabled" if importing else "normal").grid(
+                row=0, column=1, rowspan=2, padx=16)
 
     # --- journal et notifications ------------------------------------------------------------------
     def toggle_log(self) -> None:
@@ -711,7 +740,7 @@ class MainWindow(ctk.CTk):
         if d is None:
             return
         if ctrl.static is None:
-            self.toast("Catalogue Hetzner en cours de chargement, réessayez dans un instant.", "info")
+            self.toast("Catalogue du fournisseur en cours de chargement, réessaie dans un instant.", "info")
             return
         if not d.latest:
             self.toast("Ce bureau n'a aucune sauvegarde disponible.", "error")
@@ -729,12 +758,13 @@ class MainWindow(ctk.CTk):
 
     def _save_close(self, sc: ProjectScope, d: Desktop) -> None:
         ctrl = sc.controller
+        os_name = OS_NAMES.get(d.os, "Le système")
         if ctrl.config.get("confirm_save_close"):
             ok, never = confirm(self, f"Sauvegarder et fermer « {d.name} » ?",
-                                "Windows va être arrêté proprement, sauvegardé, puis le serveur supprimé pour ne "
-                                "plus rien payer d'autre que le stockage.",
+                                f"{os_name} va être arrêté proprement, sauvegardé, puis le serveur supprimé pour "
+                                "ne plus rien payer d'autre que le stockage.",
                                 "Sauvegarder & fermer", details=[
-                                    "Enregistre ton travail et ferme tes applications dans Windows avant.",
+                                    "Enregistre ton travail et ferme tes applications avant.",
                                     "Compte 5 à 20 minutes selon la taille du disque.",
                                     "Ta session RDP va se déconnecter."],
                                 checkbox="Ne plus demander")
@@ -747,7 +777,8 @@ class MainWindow(ctk.CTk):
 
     def _checkpoint(self, sc: ProjectScope, d: Desktop) -> None:
         ok, _ = confirm(self, f"Sauvegarder « {d.name} » sans le fermer ?",
-                        "Windows va s'arrêter le temps du snapshot (5 à 20 min), puis redémarrer automatiquement.",
+                        f"{OS_NAMES.get(d.os, 'Le système')} va s'arrêter le temps du snapshot (5 à 20 min), puis "
+                        "redémarrer automatiquement.",
                         "Sauvegarder", details=["Enregistre ton travail avant : la session RDP va se déconnecter."])
         if ok:
             self._safe(sc.controller.save, d.slug, False)
@@ -759,7 +790,7 @@ class MainWindow(ctk.CTk):
         kept += [f"Volume « {v.name} » ({v.size} Go)" for v in d.volumes]
         if d.fixed_ip:
             kept.append(f"IP fixe {d.fixed_ip.ip}")
-        lost = ["Tout ce qui a été fait dans Windows depuis la dernière sauvegarde"]
+        lost = ["Tout ce qui a été fait dans le bureau depuis la dernière sauvegarde"]
         if not latest:
             lost = ["TOUT le bureau : il n'a jamais été sauvegardé"]
         if confirm_typed(self, f"Fermer « {d.name} » sans sauvegarder",
@@ -769,20 +800,20 @@ class MainWindow(ctk.CTk):
             self._safe(sc.controller.discard, d.slug)
 
     def _reboot(self, sc: ProjectScope, d: Desktop) -> None:
-        ok, _ = confirm(self, f"Redémarrer « {d.name} » ?", "Windows va redémarrer (demande propre) : la session "
-                        "RDP sera coupée quelques minutes.", "Redémarrer")
+        ok, _ = confirm(self, f"Redémarrer « {d.name} » ?", f"{OS_NAMES.get(d.os, 'Le système')} va redémarrer "
+                        "(demande propre) : la session RDP sera coupée quelques minutes.", "Redémarrer")
         if ok:
             self._safe(sc.controller.power, d.slug, "reboot")
 
     def _ignore_op(self, sc: ProjectScope, d: Desktop) -> None:
         ok, _ = confirm(self, "Ignorer l'opération interrompue ?", "Le serveur reste tel quel (et facturé). "
-                        "Vous pourrez le sauvegarder ou le fermer normalement ensuite.", "Ignorer")
+                        "Tu pourras le sauvegarder ou le fermer normalement ensuite.", "Ignorer")
         if ok:
             self._safe(sc.controller.ignore_op, d.slug)
 
     def _rename(self, sc: ProjectScope, d: Desktop) -> None:
         name = ask_text(self, "Renommer le bureau", "Nouveau nom affiché (l'identifiant technique ne change pas).",
-                        d.name, "Renommer")
+                        d.name, "Renommer", allow_unchanged=False)
         if name and name != d.name:
             self._safe(sc.controller.rename, d.slug, name)
 

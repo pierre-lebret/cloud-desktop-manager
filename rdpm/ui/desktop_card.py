@@ -10,6 +10,7 @@ import customtkinter as ctk
 from ..controller import DesktopView
 from ..state import ACT_LABELS, Act
 from . import theme as t
+from .icons import OS_NAMES, icon, os_icon_name
 from .widgets import Pill, Tooltip, caption, ghost_button, label, logical, primary_button, secondary_button
 
 MENU_GROUPS = [
@@ -60,11 +61,14 @@ class DesktopCard(ctk.CTkFrame):
 
         head = ctk.CTkFrame(self, fg_color="transparent")
         head.grid(row=0, column=0, columnspan=2, sticky="ew", padx=18, pady=(16, 0))
-        head.grid_columnconfigure(0, weight=1)
+        head.grid_columnconfigure(1, weight=1)
+        self.os_icon = ctk.CTkLabel(head, text="", width=16, height=16)
+        self.os_icon.grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.os_tip = Tooltip(self.os_icon, "")
         self.name = label(head, "", 16, "bold")
-        self.name.grid(row=0, column=0, sticky="w")
+        self.name.grid(row=0, column=1, sticky="w")
         self.pill = Pill(head)
-        self.pill.grid(row=0, column=1, sticky="e")
+        self.pill.grid(row=0, column=2, sticky="e")
         self.spec = label(self, "", 12, color=t.MUTED)
         self.spec.grid(row=1, column=0, columnspan=2, sticky="ew", padx=18, pady=(2, 10))
 
@@ -125,6 +129,7 @@ class DesktopCard(ctk.CTkFrame):
         actions.grid(row=10, column=0, columnspan=2, sticky="ew", padx=18, pady=(14, 16))
         actions.grid_columnconfigure(2, weight=1)
         self.primary = primary_button(actions, "", lambda: self._act(self.view.primary), width=130)
+        self.primary_tip = Tooltip(self.primary, "")
         self.secondary = secondary_button(actions, "", lambda: self._act(self.view.secondary), width=170)
         self.more = secondary_button(actions, "⋯", self._open_menu, width=40)
         self.more.grid(row=0, column=3, sticky="e")
@@ -141,6 +146,7 @@ class DesktopCard(ctk.CTkFrame):
     def update_view(self, v: DesktopView) -> None:
         self.view = v
         self._set("name", v.name, lambda x: self.name.configure(text=x))
+        self._set("os", v.os, self._apply_os)
         self.pill.set(v.state_label, v.color)
         self._set("border", v.color, lambda c: self.configure(
             border_color=t.tone(c)[0] if c in ("warning", "danger") else t.BORDER))
@@ -163,6 +169,10 @@ class DesktopCard(ctk.CTkFrame):
         self._apply_progress(v)
         self._set("error", (v.error.message, v.error.hint, v.error.code) if v.error else None, self._apply_error)
         self._apply_buttons(v)
+
+    def _apply_os(self, os_name: str) -> None:
+        self.os_icon.configure(image=icon(self.os_icon, os_icon_name(os_name)))
+        self.os_tip.text = OS_NAMES.get(os_name, os_name)
 
     def _apply_note(self, note: str | None) -> None:
         if note:
@@ -218,6 +228,7 @@ class DesktopCard(ctk.CTkFrame):
     def _apply_buttons(self, v: DesktopView) -> None:
         self._set("primary_disabled", v.primary_disabled,
                   lambda off: self.primary.configure(state="disabled" if off else "normal"))
+        self.primary_tip.text = v.primary_hint or ""
         if v.primary != self._primary_act:
             self._primary_act = v.primary
             if v.primary:

@@ -37,7 +37,7 @@ class DuplicateOp(Operation):
                                         snap.architecture, prefer=snap.labels.get(L_LOC))
         if choice is None:
             raise UserError(f"Aucun type de serveur à {snap.disk_size} Go disponible pour la copie",
-                            "Réessayez plus tard, ou utilisez « Dupliquer et lancer ».")
+                            "Réessaie plus tard, ou utilise « Dupliquer et lancer ».")
         location, stype = choice
         self.set_phase(f"Serveur temporaire ({stype.name}, {location})…", 0)
         srv, action_ids = backend.create_server(

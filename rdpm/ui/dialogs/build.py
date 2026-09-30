@@ -41,7 +41,7 @@ class BuildDialog(Modal):
         super().__init__(app, "Créer un Windows de référence", width=1000)
         if self.static is None:
             self.heading("Créer un Windows de référence")
-            self.notice("Catalogue Hetzner en cours de chargement : réessayez dans un instant.", "info")
+            self.notice("Catalogue du fournisseur en cours de chargement : réessaie dans un instant.", "info")
             self.buttons(("Fermer", self.cancel, "secondary"))
             return
         self.heading("Créer un Windows de référence",
@@ -80,12 +80,15 @@ class BuildDialog(Modal):
         self.cost.pack(anchor="w")
         self.cost_sub = label(left, "", 11, color=t.MUTED, wraplength=600)
         self.cost_sub.pack(anchor="w")
-        self.error = label(left, "", 12, color=t.tone("danger")[0], wraplength=600)
+        self.error = label(left, "", 12, color=t.tone("warning")[0], wraplength=600)
         self.error.pack(anchor="w")
         self.create_btn = self.buttons(("Annuler", self.cancel, "secondary"),
                                        ("Créer le Windows", self._submit, "primary"))[1]
+        for var in (self.name_var, self.url_var, self.image_var, self.admin_var):
+            var.trace_add("write", lambda *_: self._update_state())
         self._on_edition(self.edition_menu.get())
         self._refresh_offers()
+        self._watch_ip()
 
     # --- sections --------------------------------------------------------------------------------
     def _identity_section(self) -> None:
@@ -111,9 +114,11 @@ class BuildDialog(Modal):
         row = ctk.CTkFrame(self.custom, fg_color="transparent")
         row.pack(fill="x")
         ctk.CTkEntry(row, textvariable=self.url_var, height=30, font=t.font(12)).pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(row, text="Vérifier", command=self._check_iso, width=80, height=30, fg_color="transparent",
-                      hover_color=t.SURFACE_3, border_width=1, border_color=t.BORDER, text_color=t.TEXT,
-                      font=t.font(12)).pack(side="left", padx=(6, 0))
+        self.check_btn = ctk.CTkButton(row, text="Vérifier", command=self._check_iso, width=80, height=30,
+                                       fg_color="transparent", hover_color=t.SURFACE_3, border_width=1,
+                                       border_color=t.BORDER, text_color=t.TEXT, text_color_disabled=t.FAINT,
+                                       font=t.font(12))
+        self.check_btn.pack(side="left", padx=(6, 0))
         self.iso_status = label(self.custom, "", 11, color=t.MUTED)
         self.iso_status.pack(fill="x")
         label(self.custom, "Nom exact de l'image dans l'ISO (DISM /Get-WimInfo), ex. « Windows 11 Pro »", 11,
@@ -199,6 +204,8 @@ class BuildDialog(Modal):
             self.custom.pack_forget()
             self.edition_note.configure(text=f"ISO officielle Microsoft, licence d'évaluation {ed.eval_days} jours "
                                              "(prolongeable avec slmgr /rearm), édition Datacenter avec bureau.")
+        if hasattr(self, "create_btn"):
+            self._update_state()
         self.refit()
 
     def _apply_language_defaults(self, code: str) -> None:
@@ -241,7 +248,7 @@ class BuildDialog(Modal):
             self.cost.configure(text="—")
             self.cost_sub.configure(text="")
             self.disk_note.configure(text="")
-            self.create_btn.configure(state="disabled")
+            self._update_state()
             return
         disk = offer.stype.disk
         self.disk_note.configure(text=f"Le snapshot aura un disque de {disk} Go : le bureau ne pourra démarrer que "
@@ -254,7 +261,7 @@ class BuildDialog(Modal):
         self.cost_sub.configure(text=f"Serveur {fmt.eur_h(offer.price_h)} + IPv4 {fmt.eur_h(pricing.ipv4_h(offer.location))}, "
                                      "1 h facturée (30 à 40 min de construction) · snapshot d'environ "
                                      f"{SNAPSHOT_GB_ESTIMATE} Go à {fmt.eur(pricing.image_gb_month, 4)}/Go/mois")
-        self.create_btn.configure(state="normal")
+        self._update_state()
 
     def _check_iso(self) -> None:
         url = self.url_var.get().strip()
@@ -284,26 +291,48 @@ class BuildDialog(Modal):
         self.ctrl._bg.submit(work)
 
     # --- validation --------------------------------------------------------------------------------
+    def _problem(self) -> str | None:
+        """Ce qui manque pour lancer la construction (affiché sous le coût), None si tout est prêt."""
+        if not self.name_var.get().strip():
+            return "Donne un nom au bureau."
+        if self.selected_offer() is None:
+            return "Choisis un type de serveur disponible."
+        if not self.ctrl.public_ip:
+            return "En attente de ton IP publique (elle limite l'accès SSH/RDP au serveur temporaire)…"
+        if self._edition().custom:
+            if not self.url_var.get().strip().lower().startswith(("http://", "https://")):
+                return "Indique le lien direct de l'ISO (http:// ou https://)."
+            if not self.image_var.get().strip():
+                return "Indique le nom de l'image (ex. « Windows 11 Pro »)."
+            if not self.admin_var.get().strip():
+                return "Indique le compte administrateur."
+        return None
+
+    def _update_state(self) -> None:
+        if not self.winfo_exists():
+            return
+        problem = self._problem()
+        self.create_btn.configure(state="normal" if problem is None else "disabled")
+        self.error.configure(text=problem or "")
+        self.check_btn.configure(state="normal" if self.url_var.get().strip() else "disabled")
+
+    def _watch_ip(self) -> None:
+        """L'IP publique peut arriver après l'ouverture : le bouton s'active alors tout seul."""
+        if not self.winfo_exists():
+            return
+        self._update_state()
+        if not self.ctrl.public_ip:
+            self.after(1000, self._watch_ip)
+
     def _submit(self) -> None:
+        if self._problem() is not None:
+            return
         name = self.name_var.get().strip()
         offer = self.selected_offer()
         ed, lang = self._edition(), self._language()
         ip = self.ctrl.public_ip
-        if not name:
-            return self.error.configure(text="Nom requis.")
-        if offer is None:
-            return self.error.configure(text="Choisis un type de serveur disponible.")
-        if not ip:
-            return self.error.configure(text="IP publique inconnue : réessaie dans un instant (elle sert à limiter "
-                                             "l'accès SSH/RDP au serveur temporaire).")
         if ed.custom:
             url, image, admin = self.url_var.get().strip(), self.image_var.get().strip(), self.admin_var.get().strip()
-            if not url.lower().startswith(("http://", "https://")):
-                return self.error.configure(text="URL de l'ISO invalide.")
-            if not image:
-                return self.error.configure(text="Nom d'image requis (ex. « Windows 11 Pro »).")
-            if not admin:
-                return self.error.configure(text="Compte administrateur requis.")
         else:
             url, image, admin = catalog.iso_url(ed.key, lang), ed.image_name, catalog.admin_account(lang)
         params = BuildParams(

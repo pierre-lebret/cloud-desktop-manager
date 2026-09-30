@@ -9,13 +9,14 @@ from datetime import date
 from .. import license, netutil, rdp
 from ..constants import (
     DEFAULT_FIREWALL_NAME, L_IMAGE, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_ROLE, OP_LABELS, OP_LAUNCHING,
-    ROLE_DESKTOP, ROLE_RDP_FIREWALL,
+    ROLE_DESKTOP, ROLE_DESKTOP_FIREWALL, ROLE_RDP_FIREWALL,
 )
 from ..hetzner.errors import UserError, to_user_error
 from ..hetzner.waiting import wait_actions, wait_server_status
 from ..labels import desktop_labels, server_name
 from .base import OpContext, Operation
 from .common import delete_server_with_retry
+from .resources import desktop_firewall_name
 
 
 @dataclass
@@ -25,9 +26,11 @@ class LaunchParams:
     server_type: str
     location: str
     base_type: str | None = None          # création sur ce type puis change_type (disque conservé)
-    firewall_id: int | None = None
-    create_firewall_cidr: str | None = None
-    allow_cidr: str | None = None
+    firewall_id: int | None = None           # liste d'accès commune à tous les bureaux
+    desktop_firewall_id: int | None = None   # liste d'accès propre au bureau (s'ajoute à la commune)
+    create_firewall_cidr: str | None = None  # crée la liste commune avec cette adresse
+    allow_cidr: str | None = None            # adresse à autoriser avant la création du serveur…
+    allow_scope: str = "shared"              # …sur la liste commune (« shared ») ou celle du bureau (« desktop »)
     allow_description: str = "Mon IP"
     volume_ids: list[int] = field(default_factory=list)
     primary_ip_id: int | None = None
@@ -47,7 +50,7 @@ class LaunchOp(Operation):
     def execute(self) -> None:
         p, backend = self.params, self.ctx.backend
         self.set_phase("Préparation…", cancellable=True)
-        firewall_id = self._prepare_firewall()
+        firewall_ids = self._prepare_firewalls()
         self.check()
 
         create_type = p.base_type or p.server_type
@@ -58,7 +61,7 @@ class LaunchOp(Operation):
         self.set_phase(f"Création du serveur ({create_type}, {p.location})…", 0)
         server, action_ids = backend.create_server(
             name=server_name(self.slug), server_type=create_type, image_id=p.snapshot_id,
-            location=p.location, labels=labels, firewall_ids=[firewall_id] if firewall_id else [],
+            location=p.location, labels=labels, firewall_ids=firewall_ids,
             volume_ids=p.volume_ids, primary_ip_id=p.primary_ip_id, start=p.base_type is None)
         self.server_id = server.id
         self.log(f"Serveur {server.name} créé ({create_type}, {p.location})")
@@ -94,20 +97,30 @@ class LaunchOp(Operation):
             self.log("Licence d'évaluation : prolongée automatiquement au démarrage (180 jours, un redémarrage de plus)")
         return license.to_labels(lic)
 
-    def _prepare_firewall(self) -> int | None:
+    def _prepare_firewalls(self) -> list[int]:
+        """Pare-feux à appliquer au serveur : liste commune et liste propre au bureau (créées au besoin)."""
         p, backend = self.params, self.ctx.backend
+        shared, own = p.firewall_id, p.desktop_firewall_id
         if p.create_firewall_cidr:
             rules = netutil.with_source_added([], p.create_firewall_cidr, p.allow_description)
             fw = backend.create_firewall(DEFAULT_FIREWALL_NAME, {L_MANAGED: "1", L_ROLE: ROLE_RDP_FIREWALL},
                                          rules)
             self.log(f"Pare-feu {fw.name} créé (RDP depuis {p.create_firewall_cidr})")
-            return fw.id
-        if p.allow_cidr and p.firewall_id:
-            ids = backend.modify_firewall_rules(
-                p.firewall_id, lambda rules: netutil.with_source_added(rules, p.allow_cidr, p.allow_description))
-            wait_actions(backend, ids, self, timeout_s=120)
-            self.log(f"IP {p.allow_cidr} autorisée sur le pare-feu")
-        return p.firewall_id
+            shared = fw.id
+        elif p.allow_cidr:
+            target = own if p.allow_scope == "desktop" else shared
+            if target:
+                ids = backend.modify_firewall_rules(
+                    target, lambda rules: netutil.with_source_added(rules, p.allow_cidr, p.allow_description))
+                wait_actions(backend, ids, self, timeout_s=120)
+            elif p.allow_scope == "desktop":
+                fw = backend.create_firewall(
+                    desktop_firewall_name(self.slug), desktop_labels(self.slug, **{L_ROLE: ROLE_DESKTOP_FIREWALL}),
+                    netutil.with_source_added([], p.allow_cidr, p.allow_description))
+                own = fw.id
+            where = "ce bureau" if p.allow_scope == "desktop" else "tous les bureaux"
+            self.log(f"IP {p.allow_cidr} autorisée pour {where}")
+        return [fid for fid in (shared, own) if fid]
 
     def _switch_type(self, server_id: int) -> None:
         p, backend = self.params, self.ctx.backend

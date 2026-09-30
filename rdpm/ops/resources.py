@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from .. import fmt, netutil
 from ..constants import (
-    DEFAULT_FIREWALL_NAME, L_EVAL_AUTO, L_MANAGED, L_ROLE, OP_LABELS, ROLE_DESKTOP, ROLE_RDP_FIREWALL,
+    DEFAULT_FIREWALL_NAME, L_EVAL_AUTO, L_MANAGED, L_ROLE, OP_LABELS, ROLE_DESKTOP, ROLE_DESKTOP_FIREWALL,
+    ROLE_RDP_FIREWALL,
 )
 from ..hetzner.waiting import wait_actions
 from ..labels import desktop_labels, format_description, parse_description
@@ -61,13 +62,18 @@ class VolumeActionOp(Operation):
             self.success_message = f"Volume « {vol.name} » supprimé"
 
 
+def desktop_firewall_name(slug: str) -> str:
+    return f"rdpm-{slug}-rdp"[:63]
+
+
 class FirewallOp(Operation):
     title = "Pare-feu"
     blocks_desktop = False
 
     def __init__(self, ctx: OpContext, firewall_id: int, add: list[tuple[str, str]] = (),
-                 remove: list[str] = (), normalize_udp: bool = False):
-        super().__init__(ctx, None, "Pare-feu")
+                 remove: list[str] = (), normalize_udp: bool = False, slug: str | None = None,
+                 name: str | None = None):
+        super().__init__(ctx, slug, name or "Pare-feu")
         self.firewall_id, self.add, self.remove, self.normalize_udp = firewall_id, list(add), list(remove), normalize_udp
 
     def execute(self) -> None:
@@ -82,6 +88,29 @@ class FirewallOp(Operation):
                      self, timeout_s=120)
         parts = [f"{c} autorisée" for c, _ in self.add] + [f"{c} retirée" for c in self.remove]
         self.success_message = "Pare-feu : " + (", ".join(parts) if parts else "règles UDP ajoutées")
+
+
+class DesktopFirewallOp(Operation):
+    """Crée la liste d'accès propre à un bureau (première adresse) et l'applique à son serveur s'il existe."""
+
+    title = "Pare-feu"
+    blocks_desktop = False
+
+    def __init__(self, ctx: OpContext, slug: str, name: str, cidr: str, description: str,
+                 server_id: int | None = None):
+        super().__init__(ctx, slug, name)
+        self.cidr, self.description, self.server_id = cidr, description, server_id
+
+    def execute(self) -> None:
+        backend = self.ctx.backend
+        self.set_phase("Création de la liste d'accès du bureau…")
+        fw = backend.create_firewall(desktop_firewall_name(self.slug),
+                                     desktop_labels(self.slug, **{L_ROLE: ROLE_DESKTOP_FIREWALL}),
+                                     netutil.with_source_added([], self.cidr, self.description))
+        if self.server_id:
+            wait_actions(backend, backend.apply_firewall(fw.id, [self.server_id]), self, timeout_s=120)
+        self.result = {"firewall_id": fw.id}
+        self.success_message = f"« {self.name} » : {self.cidr} autorisée"
 
 
 class CreateFirewallOp(Operation):
@@ -123,13 +152,14 @@ class AdoptFirewallOp(Operation):
 class ApplyFirewallOp(Operation):
     title = "Application du pare-feu"
 
-    def __init__(self, ctx: OpContext, slug: str, name: str, firewall_id: int, server_id: int):
+    def __init__(self, ctx: OpContext, slug: str, name: str, firewall_ids: list[int], server_id: int):
         super().__init__(ctx, slug, name)
-        self.firewall_id, self.server_id = firewall_id, server_id
+        self.firewall_ids, self.server_id = list(firewall_ids), server_id
 
     def execute(self) -> None:
-        wait_actions(self.ctx.backend, self.ctx.backend.apply_firewall(self.firewall_id, [self.server_id]),
-                     self, timeout_s=120)
+        for firewall_id in self.firewall_ids:
+            wait_actions(self.ctx.backend, self.ctx.backend.apply_firewall(firewall_id, [self.server_id]),
+                         self, timeout_s=120)
         self.success_message = f"Pare-feu appliqué à « {self.name} »"
 
 
@@ -237,9 +267,11 @@ class DeleteDesktopOp(Operation):
     title = "Suppression du bureau"
 
     def __init__(self, ctx: OpContext, slug: str, name: str, snapshots: list[SnapshotInfo],
-                 volumes: list[VolumeInfo], fixed_ip: PrimaryIpInfo | None, forget_password: bool):
+                 volumes: list[VolumeInfo], fixed_ip: PrimaryIpInfo | None, forget_password: bool,
+                 firewall: FirewallInfo | None = None):
         super().__init__(ctx, slug, name)
         self.snapshots, self.volumes, self.fixed_ip, self.forget_password = snapshots, volumes, fixed_ip, forget_password
+        self.firewall = firewall
 
     def execute(self) -> None:
         backend = self.ctx.backend
@@ -253,6 +285,8 @@ class DeleteDesktopOp(Operation):
             backend.delete_volume(vol.id)
         if self.fixed_ip:
             backend.delete_primary_ip(self.fixed_ip.id)
+        if self.firewall:
+            backend.delete_firewall(self.firewall.id)
         if self.forget_password:
             self.ctx.creds.delete_password(self.slug)
             self.ctx.config.forget_desktop(self.slug)
@@ -288,7 +322,7 @@ class ClearOpLabelsOp(Operation):
 
 
 class CleanupOp(Operation):
-    """Suppression d'une ressource dormante (IP, volume, snapshot, serveur temporaire)."""
+    """Suppression d'une ressource dormante (IP, volume, snapshot, serveur temporaire, liste d'accès orpheline)."""
 
     title = "Nettoyage"
     blocks_desktop = False
@@ -310,4 +344,6 @@ class CleanupOp(Operation):
             backend.delete_image(res.id)
         elif self.resource_kind == "server":
             delete_server_with_retry(self, res.id)
+        elif self.resource_kind == "firewall":
+            backend.delete_firewall(res.id)
         self.success_message = f"{self.name} : supprimé"

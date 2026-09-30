@@ -98,7 +98,7 @@ def alert(lic: EvalLicense, today: date) -> str | None:
         return (f"{head} Elle sera prolongée automatiquement de {EVAL_PERIOD_DAYS} jours au prochain lancement "
                 "(un redémarrage de plus au démarrage).")
     if lic.auto:
-        return (f"{head} Plus aucune prolongation n'est possible : copiez vos données ou passez à une licence "
+        return (f"{head} Plus aucune prolongation n'est possible : copie tes données ou passe à une licence "
                 "définitive (DISM /Set-Edition avec une clé achetée).")
-    return (f"{head} Lancez le bureau puis exécutez « slmgr /rearm » (PowerShell administrateur) et redémarrez, "
-            "ou installez la prolongation automatique (menu ⋯ → Licence d'évaluation…).")
+    return (f"{head} Lance le bureau puis exécute « slmgr /rearm » (PowerShell administrateur) et redémarre, "
+            "ou installe la prolongation automatique (menu ⋯ → Licence d'évaluation…).")

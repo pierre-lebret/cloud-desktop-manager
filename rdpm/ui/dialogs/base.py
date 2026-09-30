@@ -43,9 +43,9 @@ class Modal(ctk.CTkToplevel):
         self.footer = ctk.CTkFrame(self, fg_color="transparent")
         self.footer.pack(fill="x", padx=22, pady=(4, 18))
         _STACK.append(self)
-        self.after(20, self._activate)
+        self.after(20, self.__activate)  # nom privé : une sous-classe ne peut pas l'écraser
 
-    def _activate(self) -> None:
+    def __activate(self) -> None:
         if not self.winfo_exists():
             return
         self.update_idletasks()
@@ -55,17 +55,20 @@ class Modal(ctk.CTkToplevel):
         pw, ph = self.parent_window.winfo_width(), self.parent_window.winfo_height()
         x = max(0, px + (pw - w) // 2)
         y = max(0, py + max(20, (ph - h) // 3))
+        self._pos = (x, y)
         self.geometry(f"{w}x{h}+{x}+{y}")
         self.lift()
         self.focus_force()
         try:
             self.grab_set()
         except tk.TclError:
-            self.after(100, self._activate)
+            self.after(100, self.__activate)
 
     def refit(self) -> None:
         self.update_idletasks()
-        self.geometry(f"{max(self._width, self.winfo_reqwidth())}x{self.winfo_reqheight()}")
+        size = f"{max(self._width, self.winfo_reqwidth())}x{self.winfo_reqheight()}"
+        pos = getattr(self, "_pos", None)   # sans position, certains gestionnaires de fenêtres la remettent à 0,0
+        self.geometry(f"{size}+{pos[0]}+{pos[1]}" if pos else size)
 
     def close(self, result=None) -> None:
         self.result = result
@@ -164,7 +167,7 @@ class TypedConfirmDialog(Modal):
             self.section("Sera conservé")
             for line in kept:
                 label(self.body, f"✓  {line}", 12, color=t.tone("success")[0], wraplength=480).pack(fill="x")
-        self.section(f"Tapez {CONFIRM_WORD} pour confirmer")
+        self.section(f"Tape {CONFIRM_WORD} pour confirmer")
         self.var = tk.StringVar()
         entry = ctk.CTkEntry(self.body, textvariable=self.var, height=34, font=t.font(13),
                              placeholder_text=CONFIRM_WORD)
@@ -183,9 +186,11 @@ class TypedConfirmDialog(Modal):
 
 class TextInputDialog(Modal):
     def __init__(self, master, title: str, prompt: str, initial: str = "", ok_text: str = "Valider",
-                 secret: bool = False, validate: Callable[[str], str | None] | None = None) -> None:
+                 secret: bool = False, validate: Callable[[str], str | None] | None = None,
+                 allow_unchanged: bool = True) -> None:
         super().__init__(master, title, width=480)
         self.validate = validate
+        self.initial, self.allow_unchanged = initial.strip(), allow_unchanged
         self.heading(title)
         self.text(prompt, t.MUTED, 12)
         self.var = tk.StringVar(value=initial)
@@ -194,15 +199,28 @@ class TextInputDialog(Modal):
         self.entry.pack(fill="x", pady=(10, 0))
         self.error = label(self.body, "", 12, color=t.tone("danger")[0])
         self.error.pack(fill="x", pady=(4, 0))
-        self.buttons(("Annuler", self.cancel, "secondary"), (ok_text, self._ok, "primary"))
+        self.ok = self.buttons(("Annuler", self.cancel, "secondary"), (ok_text, self._ok, "primary"))[1]
         self.entry.bind("<Return>", lambda _e: self._ok())
+        self.var.trace_add("write", lambda *_: self._check())
+        self._check(show=False)
         self.after(80, lambda: (self.entry.focus_set(), self.entry.select_range(0, "end")))
+
+    def _problem(self, value: str) -> str | None:
+        """Raison de refus ("" : rien à signaler, mais rien à valider non plus), None si valide."""
+        if not value:
+            return ""
+        if not self.allow_unchanged and value == self.initial:
+            return ""
+        return self.validate(value) if self.validate else None
+
+    def _check(self, show: bool = True) -> None:
+        problem = self._problem(self.var.get().strip())
+        self.ok.configure(state="normal" if problem is None else "disabled")
+        self.error.configure(text=(problem or "") if show else "")
 
     def _ok(self) -> None:
         value = self.var.get().strip()
-        problem = self.validate(value) if self.validate else (None if value else "Valeur requise")
-        if problem:
-            self.error.configure(text=problem)
+        if self._problem(value) is not None:
             return
         self.close(value)
 
@@ -241,8 +259,9 @@ def confirm_typed(master, title: str, message: str, expected: str, ok_text: str,
 
 
 def ask_text(master, title: str, prompt: str, initial: str = "", ok_text: str = "Valider",
-             secret: bool = False, validate=None) -> str | None:
-    return TextInputDialog(master, title, prompt, initial, ok_text, secret, validate).show()
+             secret: bool = False, validate=None, allow_unchanged: bool = True) -> str | None:
+    """Saisie d'un texte ; le bouton reste grisé tant que la valeur est vide, invalide ou (au choix) inchangée."""
+    return TextInputDialog(master, title, prompt, initial, ok_text, secret, validate, allow_unchanged).show()
 
 
 def info(master, title: str, paragraphs: list[str], code: str | None = None) -> None:

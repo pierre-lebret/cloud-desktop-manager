@@ -178,3 +178,39 @@ def test_rdp_file():
     assert "full address:s:203.0.113.5" in content
     assert "username:s:Administrator" in content
     assert "prompt for credentials:i:0" in content
+
+
+def test_source_conflict_detects_duplicates_and_coverage():
+    assert netutil.source_conflict("1.2.3.4/32", ["1.2.3.4/32"]) == "1.2.3.4/32"
+    assert netutil.source_conflict("1.2.3.4/32", ["9.9.9.9/32", "1.2.3.0/24"]) == "1.2.3.0/24"
+    assert netutil.source_conflict("1.2.3.0/24", ["1.2.3.4/32"]) is None   # plus large : pas un doublon
+    assert netutil.source_conflict("2001:db8::1/128", ["1.2.3.0/24"]) is None
+    assert netutil.source_conflict("1.2.3.5/32", ["1.2.3.4/32", "n'importe quoi"]) is None
+
+
+def firewall(i, role, slug=None, cidrs=("1.1.1.1/32",)):
+    from rdpm.models import FirewallInfo
+    labels = {"rdpm": "1", "rdpm-role": role}
+    if slug:
+        labels["rdpm-desktop"] = slug
+    return FirewallInfo(i, f"fw-{i}", labels, (FirewallRule("in", "tcp", "3389", tuple(cidrs)),), ())
+
+
+def test_grouping_attaches_desktop_firewalls():
+    shared = firewall(1, "rdp")
+    own = firewall(2, "rdp-desktop", "bureau")
+    orphan = firewall(3, "rdp-desktop", "disparu")
+    inv = Inventory(snapshots=(snap(1, 1),), firewalls=(shared, own, orphan))
+    g = group_inventory(inv, lambda s: None)
+    assert inv.rdp_firewall == shared
+    assert g.desktops[0].firewall == own
+    assert g.orphan_firewalls == [orphan]
+    assert [d.slug for d in g.desktops] == ["bureau"]   # un pare-feu ne crée pas de bureau
+
+
+def test_desktop_os_defaults_to_windows():
+    d = Desktop("b", "B", snapshots=[snap(1, 1)])
+    assert d.os == "windows"
+    linux = snap(2, 0)
+    linux.labels["rdpm-os"] = "linux"
+    assert Desktop("b", "B", snapshots=[linux, snap(1, 1)]).os == "linux"

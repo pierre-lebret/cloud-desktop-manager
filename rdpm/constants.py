@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# APP_NAME fixe le dossier %APPDATA% et le service du Gestionnaire d'identifiants : ne pas le changer
+# (les préférences, mots de passe et clés API existants y sont rangés).
 APP_NAME = "HetznerRDP"
-APP_TITLE = "Hetzner RDP Manager"
+APP_TITLE = "Cloud Desktop Manager"
 
 APP_DIR = Path(os.environ.get("APPDATA") or Path.home()) / APP_NAME
 LOG_DIR = APP_DIR / "logs"
@@ -30,6 +32,7 @@ L_SRC_SERVER = "rdpm-src-server"
 L_TYPE = "rdpm-type"
 L_LOC = "rdpm-loc"
 L_FORCED = "rdpm-forced"
+L_OS = "rdpm-os"          # système du bureau (posé sur ses snapshots) ; absent = Windows
 
 OP_LABELS = (L_OP, L_OP_TS, L_OP_HOST, L_OP_IMAGE)
 
@@ -44,7 +47,11 @@ EVAL_ALERT_DAYS = 15     # alerte sur la carte et seuil de la prolongation autom
 
 ROLE_DESKTOP = "desktop"
 ROLE_TMP = "tmp"
-ROLE_RDP_FIREWALL = "rdp"
+ROLE_RDP_FIREWALL = "rdp"                  # liste d'accès commune à tous les bureaux du projet
+ROLE_DESKTOP_FIREWALL = "rdp-desktop"      # liste d'accès propre à un bureau (s'ajoute à la commune)
+
+OS_WINDOWS = "windows"
+OS_LINUX = "linux"
 
 OP_LAUNCHING = "launching"
 OP_SAVING = "saving"
@@ -56,7 +63,7 @@ OP_BUILDING = "building"
 RDP_PORT = "3389"
 DEFAULT_RDP_USER = "Administrator"
 DEFAULT_FIREWALL_NAME = "RDP-WINDOWS"
-MAX_FIREWALL_SOURCES = 20
+MAX_FIREWALL_SOURCES = 20   # adresses par liste d'accès
 
 DEFAULT_SETTINGS = {
     "retention": 2,

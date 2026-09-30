@@ -76,8 +76,8 @@ class HetznerService:
             err = to_user_error(exc)
             if err.code in ("unauthorized", "forbidden"):
                 raise UserError("Token refusé par Hetzner",
-                                "Vérifiez qu'il est complet et n'a pas été révoqué (console Hetzner → "
-                                "votre projet → Sécurité → Tokens API).", err.code) from exc
+                                "Vérifie qu'il est complet et n'a pas été révoqué (console Hetzner → "
+                                "ton projet → Sécurité → Tokens API).", err.code) from exc
             raise err from exc
 
     # --- transport -----------------------------------------------------------------------

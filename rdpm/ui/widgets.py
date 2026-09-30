@@ -10,6 +10,28 @@ import customtkinter as ctk
 from . import theme as t
 
 
+def bind_enabled(button, predicate: Callable[[], bool], *variables: tk.Variable) -> Callable[..., None]:
+    """Active `button` seulement quand `predicate()` est vrai ; réévalué à chaque écriture des variables.
+
+    Renvoie la fonction de mise à jour, à rappeler quand l'état dépend d'autre chose que ces variables."""
+    def update(*_args) -> None:
+        try:
+            if button.winfo_exists():
+                button.configure(state="normal" if predicate() else "disabled")
+        except tk.TclError:
+            pass
+    for var in variables:
+        var.trace_add("write", update)
+    update()
+    return update
+
+
+def on_edit(entry, callback: Callable[[], None]) -> None:
+    """Rappel après chaque modification d'un CTkEntry sans `textvariable` (qui désactiverait son placeholder)."""
+    for sequence in ("<KeyRelease>", "<<Paste>>", "<<Cut>>", "<FocusOut>"):
+        entry.bind(sequence, lambda _e: entry.after_idle(callback), add="+")
+
+
 def logical(widget, px: float) -> float:
     """Pixels physiques (winfo_width, event.width) -> unités logiques CTk (avant mise à l'échelle DPI)."""
     try:
@@ -50,19 +72,22 @@ def secondary_button(master, text: str, command: Callable, width: int = 0, **kw)
 
 def danger_button(master, text: str, command: Callable, width: int = 0, **kw) -> ctk.CTkButton:
     return ctk.CTkButton(master, text=text, command=command, fg_color=t.DANGER, hover_color=t.DANGER_HOVER,
-                         text_color="#FFFFFF", font=t.font(13, "bold"), height=34, corner_radius=8,
+                         text_color="#FFFFFF", text_color_disabled=("#F5C2C2", "#9E5A5A"), font=t.font(13, "bold"),
+                         height=34, corner_radius=8,
                          width=width or 120, **kw)
 
 
 def danger_outline_button(master, text: str, command: Callable, width: int = 0, **kw) -> ctk.CTkButton:
     return ctk.CTkButton(master, text=text, command=command, fg_color="transparent", hover_color=t.tone("danger")[1],
-                         border_width=1, border_color=t.DANGER, text_color=t.tone("danger")[0], font=t.font(13),
+                         border_width=1, border_color=t.DANGER, text_color=t.tone("danger")[0],
+                         text_color_disabled=t.FAINT, font=t.font(13),
                          height=34, corner_radius=8, width=width or 120, **kw)
 
 
 def ghost_button(master, text: str, command: Callable, width: int = 0, **kw) -> ctk.CTkButton:
     return ctk.CTkButton(master, text=text, command=command, fg_color="transparent", hover_color=t.SURFACE_3,
-                         text_color=kw.pop("text_color", t.MUTED), font=kw.pop("font", t.font(12)),
+                         text_color=kw.pop("text_color", t.MUTED), text_color_disabled=t.FAINT,
+                         font=kw.pop("font", t.font(12)),
                          height=kw.pop("height", 28), corner_radius=6, width=width or 40, **kw)
 
 
