@@ -45,7 +45,7 @@ def delete_server_with_retry(op: Operation, server_id: int, attempts: int = 3) -
         wait_server_status(backend, server_id, {"deleted"}, op, timeout_s=120, interval=3)
         return
     raise UserError("Serveur NON supprimé — il est toujours facturé",
-                    f"Réessayez la suppression. Détail : {last}", code="delete_failed", retryable=True)
+                    f"Réessaie la suppression. Détail : {last}", code="delete_failed", retryable=True)
 
 
 def stop_windows(op: Operation, srv: ServerInfo, *, quit_mode: bool = False,
@@ -159,7 +159,7 @@ def wait_snapshot_ready(op: Operation, image_id: int, action_id: int | None) -> 
         except Exception:  # noqa: BLE001
             pass
         raise UserError("Le snapshot a échoué — le serveur est conservé (éteint, toujours facturé)",
-                        "Réessayez la sauvegarde, rallumez le bureau, ou fermez-le sans sauvegarder.",
+                        "Réessaie la sauvegarde, rallume le bureau, ou ferme-le sans sauvegarder.",
                         code="snapshot_failed", retryable=True) from None
     # Sans action (reprise), on suit directement le statut de l'image.
     deadline = time.monotonic() + (180 if action_id else float(op.ctx.config.get("snapshot_timeout_s")))
@@ -167,13 +167,13 @@ def wait_snapshot_ready(op: Operation, image_id: int, action_id: int | None) -> 
         img = backend.get_image(image_id)
         if img is None and not action_id:
             raise UserError("Le snapshot interrompu a échoué — le serveur est conservé",
-                            "Relancez la sauvegarde.", code="snapshot_failed", retryable=True)
+                            "Relance la sauvegarde.", code="snapshot_failed", retryable=True)
         if img and img.available and img.image_size is not None:
             op.log(f"Snapshot vérifié : {fmt.gb(img.image_size)}")
             return image_id
         if time.monotonic() > deadline:
             raise UserError("Snapshot non confirmé — le serveur n'a PAS été supprimé",
-                            "Vérifiez l'historique des sauvegardes puis réessayez.", code="snapshot_unverified")
+                            "Vérifie l'historique des sauvegardes puis réessaie.", code="snapshot_unverified")
         op.set_phase("Vérification du snapshot…" if action_id else "Snapshot en cours…",
                      100 if action_id else None)
         op.sleep(5)

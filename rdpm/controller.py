@@ -20,7 +20,7 @@ from typing import Callable
 from . import fmt, license, netutil, rdp
 from .config import AppConfig, SessionLog
 from .constants import (
-    L_LOC, L_OP_TS, L_TYPE, OP_BUILDING, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING,
+    MAX_FIREWALL_SOURCES, OS_LINUX, L_LOC, L_OP_TS, L_TYPE, OP_BUILDING, OP_CHECKPOINT, OP_DISCARDING, OP_LAUNCHING, OP_SAVING,
     PROBE_BOOTING_S, PROBE_READY_S, PUBLIC_IP_REFRESH_S, REFRESH_BUSY_S, REFRESH_IDLE_S, STATIC_CACHE_PATH,
 )
 from .events import (
@@ -38,8 +38,8 @@ from .ops.duplicate import DuplicateOp
 from .ops.launch import LaunchOp, LaunchParams
 from .ops.resources import (
     AddVolumeOp, AdoptFirewallOp, AdoptServerOp, AdoptSnapshotOp, ApplyFirewallOp, CleanupOp,
-    ClearOpLabelsOp, CreateFirewallOp, DeleteDesktopOp, FirewallOp, FixedIpOp, PowerOp, RenameOp,
-    EvalAutoOp, SnapshotActionOp, VolumeActionOp,
+    ClearOpLabelsOp, CreateFirewallOp, DeleteDesktopOp, DesktopFirewallOp, FirewallOp, FixedIpOp, PowerOp,
+    RenameOp, EvalAutoOp, SnapshotActionOp, VolumeActionOp,
 )
 from .ops.runner import BusyError, OperationRunner
 from .ops.save import DiscardOp, ResumeOp, SaveOp
@@ -94,6 +94,8 @@ class DesktopView:
     actions: list[Act] = field(default_factory=list)
     primary: Act | None = None
     primary_disabled: bool = False
+    primary_hint: str | None = None   # pourquoi le bouton principal est grisé (infobulle)
+    os: str = "windows"
     secondary: Act | None = None
     key: str = ""            # « <projet>/<slug> » : identifiant unique dans l'interface
     project: str = ""
@@ -135,14 +137,14 @@ class QuitRow:
 
 
 class AppController:
-    """Un projet Hetzner (une clé API). Plusieurs contrôleurs cohabitent, rassemblés par ProjectHub."""
+    """Un projet chez un fournisseur cloud (une clé API). Plusieurs contrôleurs cohabitent, rassemblés par ProjectHub."""
 
     def __init__(self, backend, config: AppConfig, creds: CredentialStore, sessions: SessionLog,
                  mode: str = "live", project=None, on_secret: Callable[[str], None] | None = None) -> None:
         self.backend, self.config, self.creds, self.sessions = backend, config, creds, sessions
         self.mode = mode
         self.project = project or ProjectSpec("local", "Projet", "", "fake")
-        self.token_invalid = False   # clé refusée par Hetzner : plus aucun appel pour ce projet
+        self.token_invalid = False   # clé refusée par le fournisseur : plus aucun appel pour ce projet
         self.host = host_label()
         self.queue: SimpleQueue = SimpleQueue()
         self.hard_stop = threading.Event()
@@ -197,7 +199,7 @@ class AppController:
 
     def tick(self) -> None:
         now = time.monotonic()
-        if not self._ip_inflight and now >= self._next_ip:  # hors Hetzner : possible sans token
+        if not self._ip_inflight and now >= self._next_ip:  # hors fournisseur : possible sans token
             self._ip_inflight = True
             self._next_ip = now + PUBLIC_IP_REFRESH_S
             self._bg.submit(self._task_public_ip)
@@ -264,7 +266,7 @@ class AppController:
                 self.static = ev.static
             else:
                 self._next_static = time.monotonic() + 60
-                self._log("warning", f"Catalogue Hetzner indisponible : {to_user_error(ev.error)}")
+                self._log("warning", f"Catalogue {self.project.provider.short} indisponible : {to_user_error(ev.error)}")
             return True
         if isinstance(ev, ProbeResult):
             return self._on_probe(ev)
@@ -342,7 +344,7 @@ class AppController:
         if ev.ok and not was_ok:
             desktop = next((d for d in self.grouping.desktops if d.server and d.server.id == ev.server_id), None)
             if desktop:
-                self._log("info", "Windows est prêt : connexion RDP possible", desktop.slug)
+                self._log("info", "Le bureau est prêt : connexion RDP possible", desktop.slug)
                 if self.ui:
                     self.ui.on_ready(desktop)
                 if desktop.slug in self.pending_autoconnect:
@@ -481,7 +483,7 @@ class AppController:
             srv = d.server
             view = DesktopView(slug=d.slug, name=d.name, state=state, state_label=label, color=color,
                                spec=self._spec(d), error=self.errors.get(d.slug), key=self.key(d.slug),
-                               project=self.project.name)
+                               project=self.project.name, os=d.os)
             if srv:
                 view.ip = srv.ipv4
                 if self.static:
@@ -513,6 +515,14 @@ class AppController:
             view.primary = primary_action(state)
             if state == DState.LAUNCHING:   # bouton « Lancer » grisé tant que le serveur démarre
                 view.primary, view.primary_disabled = Act.LAUNCH, True
+                view.primary_hint = "Serveur en cours de création"
+            elif view.primary == Act.LAUNCH and not d.latest:
+                view.primary_disabled, view.primary_hint = True, "Aucune sauvegarde disponible pour ce bureau"
+            elif view.primary == Act.LAUNCH and self.static is None:
+                view.primary_disabled, view.primary_hint = True, "Catalogue du fournisseur en cours de chargement…"
+            elif view.primary == Act.CONNECT and state == DState.BOOTING:
+                view.primary_disabled = True
+                view.primary_hint = "Le système démarre : « Connecter » s'active dès que RDP répond"
             if srv and state in SERVER_STATES and view.primary != Act.SAVE_CLOSE:
                 view.secondary = Act.SAVE_CLOSE
             views.append(view)
@@ -557,25 +567,28 @@ class AppController:
 
     def _note(self, d: Desktop, state: DState) -> str | None:
         srv = d.server
+        os_label = "Linux" if d.os == OS_LINUX else "Windows"
         if state in (DState.INTERRUPTED, DState.REMOTE_OP) and srv:
             ts = srv.labels.get(L_OP_TS)
             when = fmt.ago(datetime.fromtimestamp(int(ts), timezone.utc)) if ts and ts.isdigit() else ""
             what = OP_NAMES_FR.get(srv.op, srv.op)
             where = f" sur le poste « {srv.op_host} »" if state == DState.REMOTE_OP else ""
-            return f"La {what} a été interrompue{where} {when}. Reprenez-la pour éviter des frais inutiles."
+            return f"La {what} a été interrompue{where} {when}. Reprends-la pour éviter des frais inutiles."
         if state == DState.CONFLICT:
             return f"{1 + len(d.extra_servers)} serveurs existent pour ce bureau (tous facturés)."
         if state == DState.UNREACHABLE:
             ip_ok = self.ip_is_allowed_for(d)
             if ip_ok is False:
                 return "Ton IP publique n'est pas autorisée sur le pare-feu de ce serveur."
-            return "Windows ne répond pas sur le port RDP (mises à jour ? plantage ?). Essayez Redémarrer."
+            return f"{os_label} ne répond pas sur le port RDP (mises à jour ? plantage ?). Essaie « Redémarrer »."
         if state == DState.OFF_BILLED:
-            return "Un serveur éteint reste facturé : sauvegardez et fermez-le, ou redémarrez-le."
+            return "Un serveur éteint reste facturé : sauvegarde-le et ferme-le, ou redémarre-le."
         if state == DState.BOOTING and srv and srv.firewall_ids and self.ip_is_allowed_for(d) is False:
             return "Ton IP publique n'est pas autorisée sur le pare-feu : RDP restera inaccessible."
         if srv and not srv.firewall_ids and state in SERVER_STATES:
             return "Aucun pare-feu : le port RDP est ouvert à tout Internet."
+        if srv and state in SERVER_STATES and self.unapplied_firewalls(d):
+            return "Des accès RDP de ce bureau ne sont pas appliqués à son serveur (menu ⋯ → Accès RDP…)."
         return None
 
     def costs(self) -> CostSummary | None:
@@ -584,16 +597,34 @@ class AppController:
         return compute_costs(self.inventory, self.static.pricing, self._month_sessions)
 
     # --- pare-feu et IP ---------------------------------------------------------------------------
+    # Deux listes d'accès RDP : la commune (tous les bureaux du projet) et, au besoin, une propre à chaque
+    # bureau. Hetzner additionne les règles des pare-feux appliqués à un serveur.
     def rdp_firewall(self) -> FirewallInfo | None:
+        """Liste d'accès commune à tous les bureaux du projet."""
         return self.inventory.rdp_firewall if self.inventory else None
 
     def firewalls_of(self, d: Desktop) -> list[FirewallInfo]:
+        """Pare-feux qui filtrent le bureau : ceux appliqués à son serveur, sinon ceux qui le seront au lancement."""
         if not self.inventory:
             return []
         if d.server:
             return [f for f in self.inventory.firewalls if f.id in d.server.firewall_ids]
-        fw = self.rdp_firewall()
-        return [fw] if fw else []
+        return [f for f in (self.rdp_firewall(), d.firewall) if f]
+
+    def unapplied_firewalls(self, d: Desktop) -> list[FirewallInfo]:
+        """Listes d'accès gérées du bureau pas encore appliquées à son serveur."""
+        if not d.server:
+            return []
+        return [f for f in (self.rdp_firewall(), d.firewall) if f and f.id not in d.server.firewall_ids]
+
+    def rdp_sources_of(self, slug: str | None) -> list[tuple[str, str]]:
+        """Adresses d'une liste d'accès : la commune (slug None) ou celle d'un bureau."""
+        if slug is None:
+            fw = self.rdp_firewall()
+        else:
+            d = self.desktop(slug)
+            fw = d.firewall if d else None
+        return netutil.rdp_sources(fw.rules) if fw else []
 
     def ip_is_allowed_for(self, d: Desktop) -> bool | None:
         fws = self.firewalls_of(d)
@@ -601,24 +632,69 @@ class AppController:
             return None
         return any(netutil.ip_allowed(self.public_ip, [c for c, _ in netutil.rdp_sources(f.rules)]) for f in fws)
 
-    def ip_is_allowed(self) -> bool | None:
-        fw = self.rdp_firewall()
-        if not fw or not self.public_ip:
+    def ip_access(self) -> tuple[int, int] | None:
+        """(bureaux joignables depuis ton IP, bureaux filtrés par un pare-feu) ; None si rien à évaluer.
+
+        Sans bureau filtré, la liste commune compte pour une unité."""
+        if not self.public_ip or not self.inventory:
             return None
-        return netutil.ip_allowed(self.public_ip, [c for c, _ in netutil.rdp_sources(fw.rules)])
+        states = [self.ip_is_allowed_for(d) for d in self.grouping.desktops]
+        states = [s for s in states if s is not None]
+        if states:
+            return sum(states), len(states)
+        fw = self.rdp_firewall()
+        if fw is None:
+            return None
+        return int(netutil.ip_allowed(self.public_ip, [c for c, _ in netutil.rdp_sources(fw.rules)])), 1
+
+    def ip_is_allowed(self) -> bool | None:
+        access = self.ip_access()
+        if access is None:
+            return None
+        ok, total = access
+        return ok == total
+
+    def rdp_source_problem(self, slug: str | None, cidr: str) -> str | None:
+        """Pourquoi `cidr` ne peut pas être ajouté à la liste visée (doublon, limite), sinon None."""
+        if slug is None and self.rdp_firewall() is None and self.grouping.adoptable_firewalls:
+            return f"Importe d'abord le pare-feu « {self.grouping.adoptable_firewalls[0].name} » (liste commune)"
+        own = self.rdp_sources_of(slug)
+        shared = self.rdp_sources_of(None)
+        found = netutil.source_conflict(cidr, [c for c, _ in own])
+        if found:
+            return (f"{cidr} est déjà autorisée dans cette liste" if found == cidr else
+                    f"{cidr} est déjà couverte par {found} dans cette liste")
+        if slug is not None:
+            found = netutil.source_conflict(cidr, [c for c, _ in shared])
+            if found:
+                return (f"{cidr} est déjà autorisée pour tous les bureaux" if found == cidr else
+                        f"{cidr} est déjà couverte par {found}, autorisée pour tous les bureaux")
+        else:
+            names = [d.name for d in self.grouping.desktops if d.firewall and netutil.source_conflict(
+                cidr, [c for c, _ in netutil.rdp_sources(d.firewall.rules)])]
+            if names:
+                where = ", ".join(f"« {n} »" for n in names)
+                return f"{cidr} est déjà autorisée pour {where} : retire-la d'abord de la liste de ce bureau"
+        if len(own) >= MAX_FIREWALL_SOURCES:
+            return f"Limite de {MAX_FIREWALL_SOURCES} adresses atteinte : retire les anciennes"
+        return None
+
+    def firewall_busy(self) -> bool:
+        return any(isinstance(op, (FirewallOp, DesktopFirewallOp, CreateFirewallOp, AdoptFirewallOp,
+                                   ApplyFirewallOp)) for op in self.runner.active())
 
     # --- bandeaux et dormants --------------------------------------------------------------------
     def banners(self) -> list[Banner]:
         out: list[Banner] = []
         if self.mode == "fake":
-            out.append(Banner("mode", "info", "Mode simulation : aucun appel à Hetzner, temps accéléré."))
+            out.append(Banner("mode", "info", "Mode simulation : aucun appel au fournisseur, temps accéléré."))
         elif self.mode == "readonly":
-            out.append(Banner("mode", "info", "Mode lecture seule : aucune modification ne sera envoyée à Hetzner."))
+            out.append(Banner("mode", "info", "Mode lecture seule : aucune modification ne sera envoyée au fournisseur."))
         if self.token_invalid:
-            out.append(Banner("api", "error", "Clé API refusée par Hetzner (révoquée ou supprimée) : ce projet n'est "
+            out.append(Banner("api", "error", f"Clé API refusée par {self.project.provider.short} (révoquée ou supprimée) : ce projet n'est "
                               "plus interrogé.", [("Que faire ?", "token_invalid")]))
         elif self.refresh_error:
-            out.append(Banner("api", "error", f"Hetzner injoignable : {self.refresh_error}",
+            out.append(Banner("api", "error", f"{self.project.provider.short} injoignable : {self.refresh_error}",
                               [("Réessayer", "refresh")]))
         if self.inventory is None:
             return out
@@ -637,20 +713,21 @@ class AppController:
             out.append(Banner(f"unmanaged:{srv.id}", "warning",
                               f"Serveur non géré « {srv.name} » ({fmt.status(srv.status)}, {fmt.eur_h(srv.price_hourly)}) : "
                               "il ne sera pas fermé par cette application.",
-                              [("Adopter…", f"adopt_server:{srv.id}")]))
+                              [("Importer…", f"adopt_server:{srv.id}")]))
         fw = self.rdp_firewall()
         if fw is None and g.adoptable_firewalls:
             f = g.adoptable_firewalls[0]
             out.append(Banner(f"adopt_fw:{f.id}", "info",
-                              f"Pare-feu « {f.name} » détecté : laissez l'application le gérer "
-                              "(ajout d'UDP 3389 pour un RDP plus fluide).", [("Adopter", f"adopt_fw:{f.id}")]))
-        elif fw is None:
-            out.append(Banner("no_fw", "warning", "Aucun pare-feu RDP : vos bureaux seraient ouverts à tout Internet.",
-                              [("Créer avec mon IP", "create_fw")]))
-        elif self.ip_is_allowed() is False:
+                              f"Pare-feu « {f.name} » détecté : laisse l'application le gérer "
+                              "(ajout d'UDP 3389 pour un RDP plus fluide).", [("Importer", f"adopt_fw:{f.id}")]))
+        elif fw is None and not any(d.firewall for d in g.desktops):
+            out.append(Banner("no_fw", "warning", "Aucun pare-feu RDP : tes bureaux seraient ouverts à tout Internet.",
+                              [("Créer avec mon IP", "create_fw")] if self.public_ip else [("Gérer…", "firewall")]))
+        elif (access := self.ip_access()) and access[0] == 0:
+            actions = [("Autoriser pour tous les bureaux", "allow_ip")] if fw else []
             out.append(Banner(f"ip:{self.public_ip}", "warning",
-                              f"Ton IP publique ({self.public_ip}) n'est pas autorisée sur le pare-feu RDP.",
-                              [("Autoriser", "allow_ip"), ("Gérer…", "firewall")]))
+                              f"Ton IP publique ({self.public_ip}) n'est autorisée en RDP sur aucun bureau.",
+                              actions + [("Gérer…", "firewall")]))
         if g.unmanaged_snapshots:
             n = len(g.unmanaged_snapshots)
             out.append(Banner("import", "info",
@@ -679,11 +756,14 @@ class AppController:
                                      "Non assignée, facturée en permanence", p.ipv4_m(ip.location), ip))
         for vol in g.orphan_volumes:
             items.append(DormantItem(f"vol:{vol.id}", "volume", f"Volume « {vol.name} » · {vol.size} Go ({vol.location})",
-                                     "Détaché et rattaché à aucun bureau", vol.size * p.volume_gb_month, vol))
+                                     "Détaché, n'appartient à aucun bureau", vol.size * p.volume_gb_month, vol))
         for snap in g.unmanaged_snapshots:
-            items.append(DormantItem(f"snap:{snap.id}", "snapshot", f"Snapshot « {snap.description} » · {fmt.gb(snap.image_size)}",
+            items.append(DormantItem(f"snap:{snap.id}", "snapshot", f"Snapshot « {snap.description or snap.id} » · {fmt.gb(snap.image_size)}",
                                      "Non importé" + (" · protégé" if snap.protected else ""),
                                      snap.size_gb * p.image_gb_month, snap))
+        for fw in g.orphan_firewalls:
+            items.append(DormantItem(f"fw:{fw.id}", "firewall", f"Liste d'accès « {fw.name} »",
+                                     "Reste d'un bureau supprimé (gratuit)", 0.0, fw))
         for srv in g.tmp_servers:
             if not self.runner.active():
                 what = "installation Windows" if srv.op == OP_BUILDING else "duplication"
@@ -708,7 +788,7 @@ class AppController:
     def _require(self, slug: str) -> Desktop:
         d = self.desktop(slug)
         if d is None:
-            raise UserError("Bureau introuvable (rafraîchissez)")
+            raise UserError("Bureau introuvable (rafraîchis la liste)")
         return d
 
     def launch(self, slug: str, name: str, params: LaunchParams) -> Operation:
@@ -775,11 +855,40 @@ class AppController:
     def firewall_change(self, firewall_id: int, add: list[tuple[str, str]] = (), remove: list[str] = ()) -> Operation:
         return self._submit(FirewallOp(self.ctx, firewall_id, add, remove))
 
-    def allow_current_ip(self, description: str = "Mon IP") -> Operation:
-        fw = self.rdp_firewall()
-        if not fw or not self.public_ip:
-            raise UserError("Pare-feu ou IP publique inconnus")
-        return self.firewall_change(fw.id, add=[(netutil.normalize_cidr(self.public_ip), description)])
+    def add_rdp_source(self, slug: str | None, raw: str, description: str) -> Operation:
+        """Autorise une adresse sur la liste commune (slug None) ou sur celle d'un bureau (créée au besoin)."""
+        cidr = netutil.normalize_cidr(raw)
+        problem = self.rdp_source_problem(slug, cidr)
+        if problem:
+            raise UserError(problem)
+        desc = (description or "").strip()[:60] or "Accès"
+        if slug is None:
+            fw = self.rdp_firewall()
+            if fw is None:
+                return self.create_firewall(cidr, desc)
+            return self._submit(FirewallOp(self.ctx, fw.id, add=[(cidr, desc)]))
+        d = self._require(slug)
+        if d.firewall:
+            return self._submit(FirewallOp(self.ctx, d.firewall.id, add=[(cidr, desc)], slug=slug, name=d.name))
+        if any(isinstance(op, DesktopFirewallOp) and op.slug == slug for op in self.runner.active()):
+            raise UserError("La liste d'accès de ce bureau est en cours de création : patiente un instant")
+        return self._submit(DesktopFirewallOp(self.ctx, slug, d.name, cidr, desc, d.server.id if d.server else None))
+
+    def remove_rdp_source(self, slug: str | None, cidr: str) -> Operation:
+        if slug is None:
+            fw = self.rdp_firewall()
+            if not fw:
+                raise UserError("Aucune liste d'accès commune")
+            return self.firewall_change(fw.id, remove=[cidr])
+        d = self._require(slug)
+        if not d.firewall:
+            raise UserError("Ce bureau n'a pas de liste d'accès propre")
+        return self._submit(FirewallOp(self.ctx, d.firewall.id, remove=[cidr], slug=slug, name=d.name))
+
+    def allow_current_ip(self, slug: str | None = None, description: str = "Mon IP") -> Operation:
+        if not self.public_ip:
+            raise UserError("IP publique inconnue")
+        return self.add_rdp_source(slug, self.public_ip, description)
 
     def create_firewall(self, cidr: str, description: str) -> Operation:
         server_ids = [d.server.id for d in self.grouping.desktops if d.server and not d.server.firewall_ids]
@@ -791,10 +900,11 @@ class AppController:
         return self._submit(AdoptFirewallOp(self.ctx, fw, server_ids))
 
     def apply_firewall(self, slug: str) -> Operation:
-        d, fw = self._require(slug), self.rdp_firewall()
-        if not fw:
-            raise UserError("Aucun pare-feu RDP géré")
-        return self._submit(ApplyFirewallOp(self.ctx, slug, d.name, fw.id, d.server.id))
+        d = self._require(slug)
+        missing = self.unapplied_firewalls(d)
+        if not d.server or not missing:
+            raise UserError("Rien à appliquer : les listes d'accès du bureau sont déjà en place")
+        return self._submit(ApplyFirewallOp(self.ctx, slug, d.name, [f.id for f in missing], d.server.id))
 
     def fixed_ip(self, slug: str, mode: str, location: str | None = None, ip: PrimaryIpInfo | None = None) -> Operation:
         d = self._require(slug)
@@ -827,10 +937,11 @@ class AppController:
     def delete_desktop(self, slug: str, delete_volumes: bool, delete_ip: bool) -> Operation:
         d = self._require(slug)
         if d.server:
-            raise UserError("Fermez d'abord le serveur de ce bureau")
+            raise UserError("Ferme d'abord le serveur de ce bureau")
         volumes = [v for v in d.volumes if v.server_id is None] if delete_volumes else []
         return self._submit(DeleteDesktopOp(self.ctx, slug, d.name, list(d.snapshots), volumes,
-                                            d.fixed_ip if delete_ip else None, forget_password=True))
+                                            d.fixed_ip if delete_ip else None, forget_password=True,
+                                            firewall=d.firewall))
 
     def cleanup(self, item: DormantItem) -> Operation:
         return self._submit(CleanupOp(self.ctx, item.kind, item.resource, item.title))
@@ -839,7 +950,7 @@ class AppController:
         """La tâche de prolongation a été installée à la main dans la session en cours."""
         d = self._require(slug)
         if not d.server:
-            raise UserError("Lancez d'abord le bureau : la tâche s'installe dans Windows")
+            raise UserError("Lance d'abord le bureau : la tâche s'installe dans Windows")
         return self._submit(EvalAutoOp(self.ctx, slug, d.name, d.server.id))
 
     def set_credentials(self, slug: str, user: str, password: str | None, forget: bool = False) -> None:
@@ -866,7 +977,7 @@ class AppController:
         rdp.launch_mstsc(rdp.write_rdp_file(slug, srv.ipv4, user))
         self._log("info", f"Connexion RDP à {srv.ipv4} ({user})", slug)
         if not password and self.ui:
-            self.ui.toast("Astuce : enregistrez le mot de passe (Identifiants RDP…) pour la connexion en 1 clic.", "info")
+            self.ui.toast("Astuce : enregistre le mot de passe (Identifiants RDP…) pour la connexion en 1 clic.", "info")
 
     def known_slugs(self) -> set[str]:
         slugs = {d.slug for d in self.grouping.desktops} | set(self.config.desktops)
@@ -931,7 +1042,7 @@ class AppController:
             state = self.state_of(d)
             try:
                 if state == DState.CONFLICT:
-                    raise UserError("Plusieurs serveurs pour ce bureau : résolvez le conflit")
+                    raise UserError("Plusieurs serveurs pour ce bureau : résous le conflit")
                 if state in (DState.INTERRUPTED, DState.REMOTE_OP):
                     op = self.resume(slug)
                 else:
@@ -963,11 +1074,11 @@ class AppController:
         return f"{self.project.id}/{slug}"
 
     def _token_rejected(self) -> None:
-        """Clé révoquée ou supprimée : on arrête d'interroger Hetzner et l'interface propose de l'oublier."""
+        """Clé révoquée ou supprimée : on arrête d'interroger le fournisseur et l'interface propose de l'oublier."""
         if self.token_invalid:
             return
         self.token_invalid = True
-        self._log("error", f"Clé API du projet « {self.project.name} » refusée par Hetzner")
+        self._log("error", f"Clé API du projet « {self.project.name} » refusée par {self.project.provider.short}")
         if self.ui:
             self.ui.on_token_invalid()
 

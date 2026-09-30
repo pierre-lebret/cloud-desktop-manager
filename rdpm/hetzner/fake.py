@@ -562,6 +562,12 @@ class FakeCloud:
                 "created": _iso(created), "image_size": size, "disk_size": 160, "architecture": "x86",
                 "protection": {"delete": pinned}, "os_flavor": "ubuntu",
                 "created_from": {"id": 1, "name": "rdpm-dev-perso"}, "deprecated": None}
+        fid = next(self._ids)
+        self.firewalls[fid] = {
+            "id": fid, "name": "rdpm-dev-perso-rdp", "labels": {**lab, "rdpm-role": "rdp-desktop"},
+            "created": _iso(now - timedelta(days=12)), "applied_to": [],
+            "rules": [{"description": "Bureau", "direction": "in", "port": "3389", "protocol": proto,
+                       "destination_ips": [], "source_ips": ["198.51.100.7/32"]} for proto in ("tcp", "udp")]}
         vid = next(self._ids)
         self.volumes[vid] = {"id": vid, "name": "dev-perso-data", "size": 20, "server": None,
                              "labels": dict(lab), "created": _iso(now - timedelta(days=12)),

@@ -1,4 +1,4 @@
-"""ProjectHub : plusieurs projets Hetzner (une clé API chacun) affichés ensemble.
+"""ProjectHub : plusieurs projets (une clé API chacun, chez un fournisseur cloud) affichés ensemble.
 
 Chaque projet a son AppController (inventaire, opérations, bandeaux) ; le hub les rassemble pour la fenêtre :
 cartes de tous les projets, coûts additionnés, bandeaux préfixés, « Tout sauvegarder et quitter » global.
@@ -118,11 +118,12 @@ class ProjectHub:
     def public_ip(self) -> str | None:
         return next((c.public_ip for c in self.controllers if c.public_ip), None)
 
-    def ip_is_allowed(self) -> bool | None:
-        states = [c.ip_is_allowed() for c in self.active if c.inventory]
-        if any(s is False for s in states):
-            return False
-        return True if states and all(s is True for s in states) else None
+    def ip_access(self) -> tuple[int, int] | None:
+        """(bureaux joignables depuis ton IP, bureaux filtrés) sur tous les projets ; None si rien à évaluer."""
+        parts = [a for a in (c.ip_access() for c in self.active if c.inventory) if a]
+        if not parts:
+            return None
+        return sum(ok for ok, _ in parts), sum(total for _, total in parts)
 
     def last_refresh(self) -> float | None:
         stamps = [c.last_refresh for c in self.active if c.last_refresh]

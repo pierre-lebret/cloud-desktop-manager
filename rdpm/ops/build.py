@@ -24,6 +24,7 @@ from ..build.scripts import (
 )
 from ..constants import (
     BUILD_DIR, EVAL_ALERT_DAYS, L_DESKTOP, L_FORCED, L_LOC, L_MANAGED, L_OP, L_OP_HOST, L_OP_TS, L_ROLE, L_SRC_SERVER, L_TYPE,
+    L_OS, OS_WINDOWS,
     OP_BUILDING, ROLE_TMP,
 )
 from ..hetzner.errors import OpCancelled, UserError, api_code
@@ -165,7 +166,7 @@ class BuildOp(Operation):
         size = remote.url_size(self.params.iso_url)
         if size is None:
             raise UserError("ISO Windows introuvable à cette adresse",
-                            "Vérifiez l'URL (Microsoft change parfois les liens) ou utilisez une ISO personnalisée.",
+                            "Vérifie l'URL (Microsoft change parfois les liens) ou utilise une ISO personnalisée.",
                             code="build_iso_missing")
         if size and size < catalog.MIN_ISO_BYTES:
             raise UserError(f"Le fichier à cette adresse ne ressemble pas à une ISO Windows ({fmt.gb(size / 1e9)})",
@@ -337,11 +338,11 @@ class BuildOp(Operation):
                     raise UserError("Le serveur de construction a disparu", code="build_server_lost")
                 if srv.status == "off":
                     raise UserError("Le serveur s'est éteint pendant l'installation de Windows",
-                                    "Consultez la console Hetzner (capture d'écran) pour comprendre.",
+                                    "Consulte la console Hetzner (capture d'écran) pour comprendre.",
                                     code="build_install_failed")
             if now > deadline:
                 raise UserError("Windows ne répond toujours pas en RDP",
-                                "L'installation a peut-être échoué : regardez la console Hetzner du serveur.",
+                                "L'installation a peut-être échoué : regarde la console Hetzner du serveur.",
                                 code="build_windows_timeout", retryable=True)
             elapsed = now - start
             self.set_phase(f"Installation de Windows… {fmt.clock(elapsed)}", min(95, int(elapsed / 1200 * 100)),
@@ -352,7 +353,7 @@ class BuildOp(Operation):
         backend, p = self.ctx.backend, self.params
         self.set_phase("Snapshot du Windows de référence…", 0)
         labels = desktop_labels(self.slug, **{L_SRC_SERVER: srv.id, L_TYPE: p.server_type, L_LOC: p.location,
-                                              L_FORCED: int(forced)})
+                                              L_OS: OS_WINDOWS, L_FORCED: int(forced)})
         ed = self._edition()
         if ed and ed.eval_days:   # licence d'évaluation activée pendant la construction
             labels.update(license.to_labels(license.new_license(date.today(), ed.eval_rearms, auto=True,
@@ -367,7 +368,7 @@ class BuildOp(Operation):
             if exc.code in ("snapshot_failed", "snapshot_unverified"):
                 self.image_id = None
                 raise UserError("Le snapshot de référence a échoué",
-                                "Relancez la création : le serveur temporaire va être supprimé.",
+                                "Relance la création : le serveur temporaire va être supprimé.",
                                 code="build_snapshot_failed", retryable=True) from exc
             raise
         if p.pin:
@@ -434,7 +435,7 @@ class BuildOp(Operation):
             self.server_kept = True
             self.ctx.creds.set_password(self.slug, self.password)
             self.ctx.config.update_prefs(self.slug, display_name=self.name, rdp_user=self.params.admin_account)
-            self.log("Serveur conservé (toujours facturé) : supprimez-le depuis « Dormants » quand vous aurez fini",
+            self.log("Serveur conservé (toujours facturé) : supprime-le depuis « Dormants » quand tu auras fini",
                      "warning")
             self._cleanup(delete_server=False)
         else:

@@ -1,4 +1,4 @@
-"""Projets Hetzner (une clé API = un projet) : sources des clés et cloisonnement des données locales.
+"""Projets (une clé API d'un fournisseur cloud = un projet ; seul Hetzner Cloud aujourd'hui) : sources des clés et cloisonnement des données locales.
 
 - La clé du .env (ou de la variable HETZNER_TOKEN) est toujours chargée, en premier.
 - Les autres viennent du Gestionnaire d'identifiants (« api-token:<id> ») ; leurs noms sont dans config.json.
@@ -13,6 +13,7 @@ import hashlib
 from dataclasses import dataclass
 
 from .config import AppConfig, DesktopPrefs
+from .providers import DEFAULT_PROVIDER, Provider, provider
 from .rdp import CredentialStore
 
 SOURCE_LABELS = {"env": "variable d'environnement", ".env": "fichier .env", "keyring": "Gestionnaire d'identifiants",
@@ -29,6 +30,11 @@ class ProjectSpec:
     name: str
     token: str
     source: str   # env / .env / keyring / session / fake
+    provider_id: str = DEFAULT_PROVIDER
+
+    @property
+    def provider(self) -> Provider:
+        return provider(self.provider_id)
 
     @property
     def masked(self) -> str:
@@ -71,7 +77,8 @@ class ProjectStore:
                 continue
             token = self.creds.get_token(item["id"])
             if token:
-                specs.append(ProjectSpec(item["id"], item.get("name") or f"Projet {item['id'][:4]}", token, "keyring"))
+                specs.append(ProjectSpec(item["id"], item.get("name") or f"Projet {item['id'][:4]}", token, "keyring",
+                                         item.get("provider") or DEFAULT_PROVIDER))
         if specs and not self.config.settings.get("primary_project"):
             self.config.settings["primary_project"] = specs[0].id
             self.config.save()
@@ -82,7 +89,8 @@ class ProjectStore:
 
     def remember(self, spec: ProjectSpec) -> None:
         self.creds.set_token(spec.token, spec.id)
-        items = [p for p in self._saved() if p["id"] != spec.id] + [{"id": spec.id, "name": spec.name}]
+        items = [p for p in self._saved() if p["id"] != spec.id] + [{"id": spec.id, "name": spec.name,
+                                                                        "provider": spec.provider_id}]
         self._write(items)
         spec.source = "keyring"
 

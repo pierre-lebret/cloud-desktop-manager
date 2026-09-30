@@ -65,3 +65,28 @@ def test_quit_reports_failure_and_keeps_server(tmp_path):
     assert fake.servers, "le serveur doit rester en place après un snapshot raté"
     qs.skipped.add("trading")
     assert spin(ctrl, lambda: ctrl.quit_step(qs)[1])
+
+
+def test_rdp_sources_per_desktop_and_no_duplicates(tmp_path):
+    import pytest
+    from rdpm.hetzner.errors import UserError
+    fake, ctrl = make_controller(tmp_path)
+    spin(ctrl, lambda: ctrl.inventory and ctrl.static and ctrl.public_ip)
+    op = ctrl.adopt_firewall(ctrl.grouping.adoptable_firewalls[0].id)
+    spin(ctrl, lambda: op.outcome and ctrl.rdp_firewall())
+    shared = ctrl.rdp_sources_of(None)[0][0]
+    # « dev-perso » a sa propre liste (seed démo) : 198.51.100.7/32
+    assert ctrl.desktop("dev-perso").firewall is not None
+    assert ctrl.rdp_source_problem("dev-perso", "198.51.100.7/32")          # déjà dans sa liste
+    assert ctrl.rdp_source_problem("dev-perso", shared)                      # déjà pour tous les bureaux
+    assert ctrl.rdp_source_problem(None, "198.51.100.7/32")                  # déjà sur un bureau
+    assert ctrl.rdp_source_problem("trading", "198.51.100.7/32") is None     # autre bureau : permis
+    with pytest.raises(UserError):
+        ctrl.add_rdp_source("dev-perso", "198.51.100.7", "doublon")
+    op = ctrl.add_rdp_source("trading", "198.51.100.8", "Poste B")
+    spin(ctrl, lambda: op.outcome and ctrl.desktop("trading").firewall)
+    assert op.outcome == "ok", op.error
+    trading = ctrl.desktop("trading")
+    assert ctrl.rdp_sources_of("trading") == [("198.51.100.8/32", "Poste B")]
+    assert trading.firewall.id in trading.server.firewall_ids
+    assert ctrl.rdp_sources_of("dev-perso") == [("198.51.100.7/32", "Bureau")]

@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from .constants import (
-    L_DESKTOP, L_FORCED, L_MANAGED, L_OP, L_OP_HOST, L_OP_IMAGE, L_ROLE, RDP_PORT,
-    ROLE_DESKTOP, ROLE_RDP_FIREWALL,
+    L_DESKTOP, L_FORCED, L_MANAGED, L_OP, L_OP_HOST, L_OP_IMAGE, L_OS, L_ROLE, OS_WINDOWS, RDP_PORT,
+    ROLE_DESKTOP, ROLE_DESKTOP_FIREWALL, ROLE_RDP_FIREWALL,
 )
 from .labels import parse_description
 
@@ -240,7 +240,13 @@ class FirewallInfo(_Labelled):
 
     @property
     def is_rdp_managed(self) -> bool:
+        """Liste d'accès commune à tous les bureaux du projet."""
         return self.managed and self.labels.get(L_ROLE) == ROLE_RDP_FIREWALL
+
+    @property
+    def is_desktop_firewall(self) -> bool:
+        """Liste d'accès propre à un bureau (label rdpm-desktop)."""
+        return self.managed and self.labels.get(L_ROLE) == ROLE_DESKTOP_FIREWALL and bool(self.slug)
 
     @property
     def has_rdp_rules(self) -> bool:
@@ -398,6 +404,7 @@ class Desktop:
     extra_servers: list[ServerInfo] = field(default_factory=list)
     volumes: list[VolumeInfo] = field(default_factory=list)
     fixed_ip: PrimaryIpInfo | None = None
+    firewall: FirewallInfo | None = None      # liste d'accès propre au bureau (en plus de la commune)
     placeholder: bool = False
 
     @property
@@ -411,6 +418,11 @@ class Desktop:
     @property
     def snapshot_gb(self) -> float:
         return sum(s.size_gb for s in self.snapshots)
+
+    @property
+    def os(self) -> str:
+        """Système du bureau : label du snapshot le plus récent qui le porte, Windows par défaut."""
+        return next((s.labels[L_OS] for s in self.snapshots if s.labels.get(L_OS)), OS_WINDOWS)
 
     @property
     def pinned_count(self) -> int:

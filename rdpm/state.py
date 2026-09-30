@@ -39,7 +39,7 @@ STATE_STYLE: dict[DState, tuple[str, str]] = {
     DState.SNAPSHOT_PENDING: ("Snapshot en cours", "accent"),
     DState.PENDING: ("En préparation", "accent"),
     DState.LAUNCHING: ("Création…", "info"),
-    DState.BOOTING: ("Démarrage de Windows…", "info"),
+    DState.BOOTING: ("Démarrage…", "info"),
     DState.READY: ("Prêt", "success"),
     DState.UNREACHABLE: ("RDP injoignable", "warning"),
     DState.STOPPING: ("Arrêt…", "info"),
@@ -91,10 +91,10 @@ ACT_LABELS: dict[Act, str] = {
     Act.CHECKPOINT: "Sauvegarder (reste allumé)",
     Act.DISCARD: "Fermer sans sauvegarder…",
     Act.POWER_ON: "Démarrer",
-    Act.REBOOT: "Redémarrer Windows",
+    Act.REBOOT: "Redémarrer le bureau",
     Act.ADD_VOLUME: "Ajouter un volume…",
     Act.VOLUMES: "Volumes…",
-    Act.FIREWALL: "Autoriser une IP…",
+    Act.FIREWALL: "Accès RDP…",
     Act.COPY_IP: "Copier l'IP",
     Act.COPY_PASSWORD: "Copier le mot de passe",
     Act.HISTORY: "Historique des sauvegardes…",
@@ -116,8 +116,8 @@ _RUNNING_ACTS = [Act.CONNECT, Act.SAVE_CLOSE, Act.CHECKPOINT, Act.DISCARD, Act.A
 
 _ALLOWED: dict[DState, list[Act]] = {
     DState.EMPTY: [Act.CREDENTIALS, Act.DELETE],
-    DState.ARCHIVED: [Act.LAUNCH, Act.HISTORY, Act.DUPLICATE, Act.RENAME, Act.VOLUMES, Act.FIXED_IP,
-                      Act.CREDENTIALS, Act.LICENSE, Act.DELETE],
+    DState.ARCHIVED: [Act.LAUNCH, Act.HISTORY, Act.DUPLICATE, Act.RENAME, Act.VOLUMES, Act.FIREWALL,
+                      Act.FIXED_IP, Act.CREDENTIALS, Act.LICENSE, Act.DELETE],
     DState.SNAPSHOT_PENDING: [Act.HISTORY],
     DState.PENDING: [],
     DState.LAUNCHING: [Act.CANCEL_OP],
@@ -127,7 +127,7 @@ _ALLOWED: dict[DState, list[Act]] = {
     DState.UNREACHABLE: _RUNNING_ACTS,
     DState.STOPPING: [Act.SAVE_CLOSE, Act.DISCARD],
     DState.OFF_BILLED: [Act.SAVE_CLOSE, Act.POWER_ON, Act.DISCARD, Act.ADD_VOLUME, Act.VOLUMES,
-                        Act.CREDENTIALS, Act.HISTORY],
+                        Act.FIREWALL, Act.CREDENTIALS, Act.HISTORY],
     DState.SAVING: [Act.CANCEL_OP],
     DState.CHECKPOINTING: [Act.CANCEL_OP],
     DState.DISCARDING: [],
@@ -170,6 +170,7 @@ class Grouping:
     orphan_volumes: list[VolumeInfo] = field(default_factory=list)
     unassigned_ips: list[PrimaryIpInfo] = field(default_factory=list)
     adoptable_firewalls: list[FirewallInfo] = field(default_factory=list)
+    orphan_firewalls: list[FirewallInfo] = field(default_factory=list)   # listes d'un bureau disparu
 
     def desktop(self, slug: str) -> Desktop | None:
         return next((d for d in self.desktops if d.slug == slug), None)
@@ -224,6 +225,13 @@ def group_inventory(inv: Inventory, name_for: Callable[[str], str | None],
             by_slug[ip.slug].fixed_ip = ip
         elif ip.assignee_id is None:
             g.unassigned_ips.append(ip)
+
+    for fw in inv.firewalls:
+        if fw.is_desktop_firewall:
+            if fw.slug in by_slug:
+                by_slug[fw.slug].firewall = fw
+            else:
+                g.orphan_firewalls.append(fw)
 
     if inv.rdp_firewall is None:
         g.adoptable_firewalls = [f for f in inv.firewalls if f.has_rdp_rules and not f.managed]

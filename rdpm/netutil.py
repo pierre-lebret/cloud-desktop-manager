@@ -43,7 +43,7 @@ def normalize_cidr(text: str) -> str:
     if net.prefixlen == 0:
         raise ValueError("Autoriser tout Internet (/0) exposerait RDP au monde entier : refusé")
     if net.version == 4 and net.prefixlen < 16:
-        raise ValueError("Plage trop large (moins de /16) : précisez l'adresse")
+        raise ValueError("Plage trop large (moins de /16) : précise l'adresse")
     return str(net)
 
 
@@ -61,6 +61,22 @@ def ip_allowed(ip: str | None, cidrs: list[str]) -> bool:
         except ValueError:
             continue
     return False
+
+
+def source_conflict(cidr: str, existing: list[str]) -> str | None:
+    """Source déjà présente qui est égale à `cidr` ou le contient (1.2.3.0/24 couvre 1.2.3.4/32), sinon None."""
+    try:
+        net = ipaddress.ip_network(cidr, strict=False)
+    except ValueError:
+        return None
+    for other_text in existing:
+        try:
+            other = ipaddress.ip_network(other_text, strict=False)
+        except ValueError:
+            continue
+        if other.version == net.version and net.subnet_of(other):
+            return other_text
+    return None
 
 
 def rdp_sources(rules: tuple[FirewallRule, ...] | list[FirewallRule]) -> list[tuple[str, str]]:

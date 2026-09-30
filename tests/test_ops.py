@@ -205,3 +205,38 @@ def test_probe_waits_for_boot(harness):
     assert not h.backend.rdp_probe(srv.ipv4)
     h.fake.boot_at[srv.id] = h.fake.sim() - BOOT_TO_RDP_S - 1
     assert h.backend.rdp_probe(srv.ipv4)
+
+
+def test_desktop_firewall_created_and_applied(harness):
+    from rdpm.ops.resources import DesktopFirewallOp
+    h = harness()
+    adopt(h)
+    srv = launch(h)
+    op = h.run(DesktopFirewallOp(h.ctx, "win", "Windows", "198.51.100.9/32", "Poste", srv.id))
+    assert op.outcome == "ok", op.error
+    fw = h.backend.get_firewall(op.result["firewall_id"])
+    assert fw.is_desktop_firewall and fw.slug == "win" and not fw.is_rdp_managed
+    assert {r.protocol for r in fw.rules} == {"tcp", "udp"}
+    assert set(h.backend.get_server(srv.id).firewall_ids) == {FIREWALL, fw.id}
+
+
+def test_launch_applies_shared_and_desktop_lists(harness):
+    h = harness()
+    adopt(h)
+    srv = launch(h, allow_cidr="198.51.100.10/32", allow_scope="desktop")
+    own = next(f for f in h.backend.fetch_inventory().firewalls if f.is_desktop_firewall)
+    assert own.slug == "win" and "198.51.100.10/32" in {c for r in own.rules for c in r.source_ips}
+    assert set(srv.firewall_ids) == {FIREWALL, own.id}
+    shared = h.backend.get_firewall(FIREWALL)
+    assert "198.51.100.10/32" not in {c for r in shared.rules for c in r.source_ips}
+
+
+def test_delete_desktop_removes_its_firewall(harness):
+    from rdpm.ops.resources import DeleteDesktopOp, DesktopFirewallOp
+    h = harness()
+    adopt(h)
+    op = h.run(DesktopFirewallOp(h.ctx, "win", "Windows", "198.51.100.9/32", "Poste"))
+    fw = h.backend.get_firewall(op.result["firewall_id"])
+    op = h.run(DeleteDesktopOp(h.ctx, "win", "Windows", [], [], None, forget_password=False, firewall=fw))
+    assert op.outcome == "ok", op.error
+    assert fw.id not in h.fake.firewalls
